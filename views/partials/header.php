@@ -5,23 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Marché fermier en ligne, produits frais locaux et livraison rapide.">
     <?php
+    $currentAction = $_GET['action'] ?? 'home';
     $pageTitle = $pageTitle ?? 'Farmmarket';
     $googleMapsKey = getenv('VITE_GOOGLE_MAPS_API_KEY') ?: ($_ENV['VITE_GOOGLE_MAPS_API_KEY'] ?? '');
+    $loadLeaflet = $currentAction === 'checkout';
     ?>
     <meta name="google-maps-api-key" content="<?= htmlspecialchars($googleMapsKey) ?>">
     <title><?= htmlspecialchars($pageTitle) ?></title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="public/css/tailwind.min.css">
+    <link rel="stylesheet" href="public/css/fonts.css">
     <link rel="stylesheet" href="public/css/style.css">
+    <?php if ($loadLeaflet) : ?>
+        <link rel="stylesheet" href="public/lib/leaflet/leaflet.css">
+        <script defer src="public/lib/leaflet/leaflet.js"></script>
+    <?php endif; ?>
 
-    <script defer src="public/js/googleMapsLoader.js"></script>
-    <script defer src="public/js/googleMapsIntegration.js"></script>
+    <?php
+    // Load Google Maps scripts only when a real API key is configured and
+    // never on the checkout page (checkout uses Leaflet/OpenStreetMap).
+    $isCheckoutPage = in_array($currentAction, ['checkout', 'checkout/mobile'], true);
+    if (!empty($googleMapsKey) && $googleMapsKey !== 'your-google-maps-api-key' && !$isCheckoutPage) :
+    ?>
+        <script defer src="public/js/googleMapsLoader.js"></script>
+        <script defer src="public/js/googleMapsIntegration.js"></script>
+    <?php endif; ?>
+
     <script defer src="public/js/app.js"></script>
 </head>
 <?php
-$pageTitle = $pageTitle ?? 'Farmmarket';
-$currentAction = $_GET['action'] ?? 'home';
 $userRole = $_SESSION['user']['role'] ?? null;
 $isFarmer = $userRole === 'farmer';
 $isDelivery = $userRole === 'delivery';
@@ -73,11 +85,13 @@ if (!isset($_SESSION['user'])) {
 ?>
 <body class="<?= $isFarmer ? 'farmer-theme bg-slate-950 text-slate-100' : ($isDelivery ? 'delivery-theme bg-amber-50 text-slate-900' : 'bg-slate-50 text-slate-900') ?> flex flex-col min-h-screen">
 <header class="site-header shadow-sm sticky top-0 z-20 flex-shrink-0 <?= $isFarmer ? 'farmer-header' : ($isDelivery ? 'delivery-header' : '') ?>">
-    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 md:px-6">
+    <div class="mx-auto flex w-full max-w-6xl flex-col items-start gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:gap-0 md:px-6">
         <a href="<?= $logoLink ?>" class="site-logo text-2xl md:text-3xl font-bold text-white">Farmmarket</a>
-        <nav class="site-nav flex items-center gap-2 md:gap-3 text-xs sm:text-sm flex-wrap md:flex-nowrap" aria-label="Navigation principale">
+        <nav class="site-nav flex w-full flex-wrap items-center gap-2 md:flex-nowrap md:w-auto text-xs sm:text-sm justify-start md:justify-end" aria-label="Navigation principale">
             <?php foreach ($mainLinks as $link): ?>
-                <a href="<?= $link['href'] ?>" class="nav-pill<?= $link['active'] ? ' nav-pill-active' : '' ?>"><?= htmlspecialchars($link['label']) ?></a>
+                <?php $linkClasses = 'inline-flex items-center justify-center px-3 py-2 rounded-full border text-sm font-semibold transition-colors duration-150 whitespace-nowrap'; ?>
+                <?php $linkClasses .= $link['active'] ? ' bg-slate-950 text-white border-slate-950' : ' bg-white/90 text-slate-900 border-slate-200 hover:bg-slate-100'; ?>
+                <a href="<?= $link['href'] ?>" class="<?= $linkClasses ?>"><?= htmlspecialchars($link['label']) ?></a>
             <?php endforeach; ?>
 
             <?php if (isset($_SESSION['user'])) : ?>
