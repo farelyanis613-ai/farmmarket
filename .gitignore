@@ -1,0 +1,31 @@
+# Ignore local environment files
+.env
+.env.*
+
+# Ignore database exports and sensitive files
+database.sql
+cookies.txt
+response.html
+
+# Ignore dependency artifacts and cache
+vendor/
+vendor/*
+composer.lock
+lint_results.txt
+
+
+# Ignore Python and Node artifacts if present
+__pycache__/
+*.pyc
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore editor and OS files
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.cache
+cookies.txt
