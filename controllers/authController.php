@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../models/UserModel.php';
 require_once __DIR__ . '/../core/Controller.php';
+require_once __DIR__ . '/../config/database.php';
 
 function login()
 {
@@ -23,12 +24,50 @@ function login()
                 $userModel = new UserModel();
                 $user = $userModel->findByEmail($email);
 
+                // Brute-force protection: use login_attempts table when available, fallback to session
+                $identifier = strtolower(trim($email ?: ($_SERVER['REMOTE_ADDR'] ?? 'unknown')));
+                $maxAttempts = 5;
+                $lockMinutes = 15;
+
+                $isLocked = false;
+                try {
+                    if (isset($pdo)) {
+                        $stmt = $pdo->prepare('SELECT attempts, locked_until FROM login_attempts WHERE identifier = ?');
+                        $stmt->execute([$identifier]);
+                        $la = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if ($la && !empty($la['locked_until']) && strtotime($la['locked_until']) > time()) {
+                            $isLocked = true;
+                            $remaining = ceil((strtotime($la['locked_until']) - time()) / 60);
+                            $errors[] = 'Trop de tentatives. Réessayez dans ' . $remaining . ' minutes.';
+                        }
+                    }
+                } catch (Exception $e) {
+                    // ignore DB errors on attempts check; we'll fallback to session below
+                }
+
+                // Session fallback lock check
+                if (!$isLocked && empty($errors)) {
+                    if (!empty($_SESSION['login_attempts'][$identifier]['locked_until']) && strtotime($_SESSION['login_attempts'][$identifier]['locked_until']) > time()) {
+                        $isLocked = true;
+                        $remaining = ceil((strtotime($_SESSION['login_attempts'][$identifier]['locked_until']) - time()) / 60);
+                        $errors[] = 'Trop de tentatives. Réessayez dans ' . $remaining . ' minutes.';
+                    }
+                }
+
+                if ($isLocked) {
+                    // render immediately without checking password to avoid timing attacks
+                    $controller->render('auth/login.php', ['errors' => $errors, 'next' => trim($_GET['next'] ?? ''), 'csrf_token' => getCsrfToken()]);
+                    return;
+                }
+
                 if ($user && password_verify($password, $user['password'])) {
                     if ($as && $user['role'] !== $as) {
                         $errors[] = 'Accès non autorisé pour ce type de compte.';
                     } else {
                         // Prevent session fixation
-                        if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
+                        if (session_status() !== PHP_SESSION_ACTIVE) {
+                            session_start();
+                        }
                         session_regenerate_id(true);
 
                         $_SESSION['user'] = [
@@ -49,14 +88,64 @@ function login()
                         ];
                         
                         $redirect = $redirects[$user['role']] ?? 'index.php?action=home';
-                        if ($user['role'] === 'client' && in_array($next, ['orders', 'products', 'cart', 'checkout'], true)) {
+                        $allowedNext = ['orders', 'products', 'cart', 'checkout', 'checkout/mobile'];
+                        if ($user['role'] === 'client' && in_array($next, $allowedNext, true)) {
                             $redirect = 'index.php?action=' . $next;
                         }
                         
+                        // On successful login reset login attempts
+                        try {
+                            if (isset($pdo)) {
+                                $stmt = $pdo->prepare('DELETE FROM login_attempts WHERE identifier = ?');
+                                $stmt->execute([$identifier]);
+                            }
+                        } catch (Exception $e) { /* ignore */ }
+                        if (isset($_SESSION['login_attempts'][$identifier])) {
+                            unset($_SESSION['login_attempts'][$identifier]);
+                        }
+
                         $controller->redirect($redirect);
                     }
                 } else {
                     $errors[] = 'Identifiants incorrects.';
+
+                    // Record failed attempt (DB if available, else session)
+                    try {
+                        if (isset($pdo)) {
+                            $stmt = $pdo->prepare('SELECT attempts FROM login_attempts WHERE identifier = ?');
+                            $stmt->execute([$identifier]);
+                            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                            if ($row) {
+                                $attempts = intval($row['attempts']) + 1;
+                                $lockedUntil = null;
+                                if ($attempts >= $maxAttempts) {
+                                    $lockedUntil = date('Y-m-d H:i:s', time() + $lockMinutes * 60);
+                                }
+                                $u = $pdo->prepare('UPDATE login_attempts SET attempts = ?, last_failed = NOW(), locked_until = ? WHERE identifier = ?');
+                                $u->execute([$attempts, $lockedUntil, $identifier]);
+                            } else {
+                                $lockedUntil = null;
+                                $attempts = 1;
+                                if ($attempts >= $maxAttempts) {
+                                    $lockedUntil = date('Y-m-d H:i:s', time() + $lockMinutes * 60);
+                                }
+                                $i = $pdo->prepare('INSERT INTO login_attempts (identifier, attempts, last_failed, locked_until) VALUES (?, ?, NOW(), ?)');
+                                $i->execute([$identifier, $attempts, $lockedUntil]);
+                            }
+                        } else {
+                            // session fallback
+                            if (!isset($_SESSION['login_attempts'])) $_SESSION['login_attempts'] = [];
+                            if (!isset($_SESSION['login_attempts'][$identifier])) {
+                                $_SESSION['login_attempts'][$identifier] = ['attempts' => 1, 'last_failed' => time()];
+                            } else {
+                                $_SESSION['login_attempts'][$identifier]['attempts']++;
+                                $_SESSION['login_attempts'][$identifier]['last_failed'] = time();
+                            }
+                            if ($_SESSION['login_attempts'][$identifier]['attempts'] >= $maxAttempts) {
+                                $_SESSION['login_attempts'][$identifier]['locked_until'] = time() + ($lockMinutes * 60);
+                            }
+                        }
+                    } catch (Exception $e) { /* ignore logging errors */ }
                 }
             }
         }
