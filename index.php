@@ -1,4 +1,21 @@
 <?php
+// Load environment helpers early so we can read APP_ENV and related vars
+require_once __DIR__ . '/config/bootstrap.php';
+loadEnvFile(__DIR__ . '/.env');
+
+// Configure secure session cookie params before starting the session
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+$appEnv = env('APP_ENV', '');
+$secure = $isHttps || strtolower($appEnv) === 'production';
+
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => '/',
+    'domain' => $_SERVER['HTTP_HOST'] ?? '',
+    'secure' => $secure,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
 
 require_once __DIR__ . '/config/database.php';
@@ -71,7 +88,12 @@ switch ($action) {
         require_once __DIR__ . '/controllers/orderController.php';
         orderHistory();
         break;
+    case 'order/clear-history':
+        require_once __DIR__ . '/controllers/orderController.php';
+        clearOrderHistory();
+        break;
     case 'order/invoice':
+    case 'order/pdf':
         require_once __DIR__ . '/controllers/orderController.php';
         downloadInvoice();
         break;
@@ -82,6 +104,10 @@ switch ($action) {
     case 'order/mark-delivered':
         require_once __DIR__ . '/controllers/orderController.php';
         markOrderDelivered();
+        break;
+    case 'order/report-failure':
+        require_once __DIR__ . '/controllers/orderController.php';
+        reportFailure();
         break;
 
     // Auth routes
@@ -112,8 +138,9 @@ switch ($action) {
         farmerAddProduct();
         break;
     case 'farmer/add-delivery':
-        require_once __DIR__ . '/controllers/farmerController.php';
-        farmerAddDelivery();
+        // Deprecated route kept for backward compatibility - redirect to canonical route
+        header('Location: index.php?action=farmer/deliveries/add', true, 302);
+        exit;
         break;
     case 'farmer/edit-product':
         require_once __DIR__ . '/controllers/farmerController.php';
@@ -158,6 +185,10 @@ switch ($action) {
     case 'farmer/assign-delivery':
         require_once __DIR__ . '/controllers/farmerController.php';
         farmerAssignDelivery();
+        break;
+    case 'farmer/orders-poll':
+        require_once __DIR__ . '/controllers/farmerController.php';
+        farmerOrdersPoll();
         break;
     case 'farmer/mark-pickup':
         require_once __DIR__ . '/controllers/farmerController.php';
@@ -220,6 +251,10 @@ switch ($action) {
     case 'delivery/order-detail':
         require_once __DIR__ . '/controllers/deliveryController.php';
         deliveryOrderDetail();
+        break;
+    case 'delivery/assignments-poll':
+        require_once __DIR__ . '/controllers/deliveryController.php';
+        deliveryAssignmentsPoll();
         break;
 
     // Serve farmer images through PHP route
