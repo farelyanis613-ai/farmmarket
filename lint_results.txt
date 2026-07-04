@@ -1,0 +1,138 @@
+﻿=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\config\currency.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\config\currency.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\config\database.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\config\database.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\accountController.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\accountController.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\adminController.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\adminController.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\authController.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\authController.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\cartController.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\cartController.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\deliveryController.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\deliveryController.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\farmerController.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\farmerController.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\imageController.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\imageController.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\orderController.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\orderController.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\productController.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\controllers\productController.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\core\Controller.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\core\Controller.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\core\helpers.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\core\helpers.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\core\Model.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\core\Model.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\farmer-login.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\farmer-login.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\import_db.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\import_db.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\index.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\index.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_add_gps_coordinates.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_add_gps_coordinates.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_add_order_columns.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_add_order_columns.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_delivery.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_delivery.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_delivery_address.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_delivery_address.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_delivery_options.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_delivery_options.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_profile.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_profile.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_roles.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\migrate_roles.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\CartModel.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\CartModel.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\CategoryModel.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\CategoryModel.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\DeliveryModel.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\DeliveryModel.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\DeliveryPersonModel.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\DeliveryPersonModel.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\OrderModel.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\OrderModel.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\ProductModel.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\ProductModel.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\UserModel.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\models\UserModel.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\tools\lint_all.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\tools\lint_all.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\account\profile.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\account\profile.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\admin\dashboard.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\admin\dashboard.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\auth\login.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\auth\login.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\auth\register.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\auth\register.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\checkout.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\checkout.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\checkout_mobile.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\checkout_mobile.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\confirmation.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\confirmation.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\orders.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\orders.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\order_detail.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\order_detail.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\view.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\cart\view.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\assignments.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\assignments.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\dashboard.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\dashboard.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\details.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\details.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\failure_reason.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\failure_reason.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\history.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\history.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\how_it_works.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\how_it_works.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\order_detail.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\order_detail.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\stats.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\delivery\stats.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\add_category.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\add_category.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\add_delivery.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\add_delivery.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\add_product.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\add_product.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\assign_delivery.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\assign_delivery.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\categories.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\categories.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\dashboard.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\dashboard.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\deliveries.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\deliveries.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\deliveries_add.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\deliveries_add.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\deliveries_edit.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\deliveries_edit.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\edit_category.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\edit_category.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\edit_product.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\edit_product.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\orders.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\orders.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\order_detail.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\order_detail.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\products.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\farmer\products.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\home.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\home.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\partials\footer.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\partials\footer.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\partials\header.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\partials\header.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\products\list.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\products\list.php
+=== C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\products\view.php
+No syntax errors detected in C:\Users\Yanis\Desktop\SOUTENANCE\FARMMARKET\views\products\view.php

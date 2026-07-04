@@ -1,0 +1,32 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="95" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+  
+  <!-- Leaf elements -->
+  <g id="leaf1" transform="translate(70, 60)">
+    <ellipse cx="0" cy="0" rx="12" ry="8" fill="#16a34a" transform="rotate(-30)"/>
+    <ellipse cx="0" cy="0" rx="10" ry="6" fill="#22c55e" transform="rotate(-30)"/>
+  </g>
+  
+  <g id="leaf2" transform="translate(130, 60)">
+    <ellipse cx="0" cy="0" rx="12" ry="8" fill="#16a34a" transform="rotate(30)"/>
+    <ellipse cx="0" cy="0" rx="10" ry="6" fill="#22c55e" transform="rotate(30)"/>
+  </g>
+  
+  <g id="leaf3" transform="translate(100, 80)">
+    <ellipse cx="0" cy="0" rx="14" ry="9" fill="#16a34a"/>
+    <ellipse cx="0" cy="0" rx="12" ry="7" fill="#22c55e"/>
+  </g>
+  
+  <!-- Basket/container shape -->
+  <path d="M 60 110 L 55 140 Q 55 145 60 145 L 140 145 Q 145 145 145 140 L 140 110 Z" 
+        fill="none" stroke="#16a34a" stroke-width="2.5"/>
+  <line x1="60" y1="110" x2="140" y2="110" stroke="#16a34a" stroke-width="2.5"/>
+  <line x1="80" y1="110" x2="75" y2="145" stroke="#16a34a" stroke-width="1.5" opacity="0.5"/>
+  <line x1="100" y1="110" x2="100" y2="145" stroke="#16a34a" stroke-width="1.5" opacity="0.5"/>
+  <line x1="120" y1="110" x2="125" y2="145" stroke="#16a34a" stroke-width="1.5" opacity="0.5"/>
+  
+  <!-- Text -->
+  <text x="100" y="170" font-family="Arial, sans-serif" font-size="14" font-weight="bold" 
+        text-anchor="middle" fill="#16a34a">FARMMARKET</text>
+</svg>

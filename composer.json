@@ -1,0 +1,19 @@
+{
+    "name": "farmmarket/farmmarket",
+    "description": "FarmMarket - E-commerce platform for agricultural products",
+    "type": "project",
+    "require": {
+        "phpmailer/phpmailer": "^6.9",
+        "dompdf/dompdf": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "FarmMarket\\": "."
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "composer/installers": true
+        }
+    }
+}
