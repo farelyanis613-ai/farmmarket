@@ -1,6 +1,11 @@
 RewriteEngine On
 DirectoryIndex index.php
 RewriteBase /
+
+# Bloquer l'accès direct à des fichiers sensibles ou outils non destinés au web
+# Bloque récursivement tout sous-répertoire de tools/ et config/ et corrige les chemins vers tools/check_*
+RewriteRule ^(tools/.*|download_assets\.py|tools/download_tailwind_css\.py|config/.*|tools/check_categories\.php|tools/check_orders_columns\.php|import_db\.php|migrate_[^/]+\.php|NotificationService\.php|config\.php|package\.json|response\.html|\.env(?:\.example)?|cookies\.txt|database\.sql|composer\.(?:json|lock))$ - [F,L]
+
 RewriteRule ^$ index.php [L,QSA]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
