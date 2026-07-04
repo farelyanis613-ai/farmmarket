@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../models/OrderModel.php';
 require_once __DIR__ . '/../models/CartModel.php';
 require_once __DIR__ . '/../core/Controller.php';
+require_once __DIR__ . '/../NotificationService.php';
 
 function checkout()
 {
@@ -38,7 +39,9 @@ function checkoutMobile()
     }
 
     $deliveryType = trim($_GET['delivery_type'] ?? 'home');
-    $deliveryFee  = intval($_GET['delivery_fee'] ?? ($deliveryType === 'pickup' ? 0 : 2000));
+    $deliveryFee  = intval($_GET['delivery_fee'] ?? getDeliveryFee($deliveryType));
+    $deliveryLatitude  = trim($_GET['latitude'] ?? '');
+    $deliveryLongitude = trim($_GET['longitude'] ?? '');
 
     $subtotal = 0;
     foreach ($cart as $item) {
@@ -47,17 +50,25 @@ function checkoutMobile()
     $total = $subtotal + $deliveryFee;
 
     $controller->render('cart/checkout_mobile.php', [
-        'cart'         => $cart,
-        'deliveryType' => $deliveryType,
-        'deliveryFee'  => $deliveryFee,
-        'subtotal'     => $subtotal,
-        'total'        => $total,
+        'cart'              => $cart,
+        'deliveryType'      => $deliveryType,
+        'deliveryFee'       => $deliveryFee,
+        'deliveryLatitude'  => $deliveryLatitude,
+        'deliveryLongitude' => $deliveryLongitude,
+        'subtotal'          => $subtotal,
+        'total'             => $total,
     ]);
 }
 
 function checkoutComplete()
 {
     $controller = new Controller();
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $_SESSION['error'] = 'Requête invalide ou jeton CSRF manquant.';
+        $controller->redirect('index.php?action=checkout');
+        return;
+    }
 
     if (!isset($_SESSION['user'])) {
         $controller->redirect('index.php?action=login&next=checkout');
@@ -74,8 +85,49 @@ function checkoutComplete()
     $deliveryFee     = intval($_POST['delivery_fee']   ?? 0);
     $deliveryAddress = trim($_POST['delivery_address'] ?? '');
 
-    if ($deliveryAddress === '' && !empty($_SESSION['user']['address'])) {
-        $deliveryAddress = $_SESSION['user']['address'];
+    // Coordonnées GPS sélectionnées par le client sur la carte (checkout.php).
+    // Uniquement pertinentes pour une livraison à domicile.
+    $deliveryLatitude  = null;
+    $deliveryLongitude = null;
+
+    if ($deliveryType === 'home') {
+        if ($deliveryAddress === '' && !empty($_SESSION['user']['address'])) {
+            $deliveryAddress = $_SESSION['user']['address'];
+        }
+
+        if (isset($_POST['delivery_latitude']) && $_POST['delivery_latitude'] !== '') {
+            $lat = filter_var($_POST['delivery_latitude'], FILTER_VALIDATE_FLOAT);
+            if ($lat !== false && $lat >= -90 && $lat <= 90) {
+                $deliveryLatitude = $lat;
+            }
+        }
+
+        if (isset($_POST['delivery_longitude']) && $_POST['delivery_longitude'] !== '') {
+            $lng = filter_var($_POST['delivery_longitude'], FILTER_VALIDATE_FLOAT);
+            if ($lng !== false && $lng >= -180 && $lng <= 180) {
+                $deliveryLongitude = $lng;
+            }
+        }
+
+        // On ne garde les coordonnées que si les deux sont valides ensemble.
+        if ($deliveryLatitude === null || $deliveryLongitude === null) {
+            $deliveryLatitude  = null;
+            $deliveryLongitude = null;
+        }
+    } else {
+        $deliveryAddress = '';
+    }
+
+    $mobileMoneyPhone = normalizePhone(trim($_POST['phone_number'] ?? ''));
+    if ($mobileMoneyPhone !== '') {
+        if (!isValidBeninPhone($mobileMoneyPhone)) {
+            $_SESSION['error'] = 'Numéro Mobile Money invalide. Utilisez le format +229 xxxxxxxxxx.';
+            $_SESSION['old_phone_number'] = $_POST['phone_number'] ?? '';
+            $_SESSION['old_operator'] = trim($_POST['operator'] ?? 'Moov Money');
+            $_SESSION['old_delivery_address'] = $deliveryAddress;
+            $controller->redirect('index.php?action=checkout/mobile&delivery_type=' . urlencode($deliveryType) . '&delivery_fee=' . urlencode($deliveryFee));
+            return;
+        }
     }
 
     $orderModel = new OrderModel();
@@ -84,7 +136,9 @@ function checkoutComplete()
         $cart,
         $deliveryType,
         $deliveryFee,
-        $deliveryAddress
+        $deliveryAddress,
+        $deliveryLatitude,
+        $deliveryLongitude
     );
 
     if (!$orderId) {
@@ -98,32 +152,34 @@ function checkoutComplete()
     $order      = $orderModel->getOrderWithDetails($orderId);
     $orderItems = $orderModel->getOrderItems($orderId);
 
+    try {
+        notifierEleveurNouvelleCommande($order);
+    } catch (Exception $e) {
+        error_log('[checkoutComplete] notifierEleveurNouvelleCommande error: ' . $e->getMessage());
+    }
+
     CartModel::clearCart();
     unset($_SESSION['promo_code'], $_SESSION['cart_delivery']);
 
-    $receiptRequested = isset($_POST['receipt_email']) && intval($_POST['receipt_email']) === 1;
-    $receiptEmail     = trim($_POST['receipt_email_address'] ?? '');
-    $successMessage   = 'Paiement effectué avec succès.';
-
-    if ($receiptRequested) {
-        if ($receiptEmail === '' && !empty($_SESSION['user']['email'])) {
-            $receiptEmail = $_SESSION['user']['email'];
-        }
-
-        if (!empty($receiptEmail) && filter_var($receiptEmail, FILTER_VALIDATE_EMAIL)) {
-            $sent = sendInvoiceEmail($orderId, $receiptEmail);
-            if ($sent) {
-                $successMessage = 'Paiement effectué avec succès. La facture a été envoyée à ' . htmlspecialchars($receiptEmail) . '.';
-            } else {
-                error_log('[checkoutComplete] sendInvoiceEmail failed for ' . $receiptEmail);
-                $successMessage = 'Paiement effectué avec succès. Envoi de la facture par email impossible.';
-            }
+    // Envoi automatique de la facture par email au client
+    $clientEmail = $_SESSION['user']['email'] ?? ($order['customer_email'] ?? '');
+    if (!empty($clientEmail) && filter_var($clientEmail, FILTER_VALIDATE_EMAIL)) {
+        $sentInvoice = sendInvoiceEmail($orderId, $clientEmail);
+        if ($sentInvoice) {
+            $_SESSION['success'] = 'Paiement effectué avec succès. La facture a été envoyée à ' . htmlspecialchars($clientEmail) . '.';
         } else {
-            $successMessage = 'Paiement effectué avec succès. Adresse email de facture invalide ou absente.';
+            $_SESSION['success'] = 'Paiement effectué. Envoi automatique de la facture impossible.';
         }
+    } else {
+        $_SESSION['success'] = 'Paiement effectué. Adresse email client absente ou invalide.';
     }
 
-    $_SESSION['success'] = $successMessage;
+    try {
+        notifierClientFacture($order, $_SESSION['user']);
+    } catch (Exception $e) {
+        error_log('[checkoutComplete] notifierClientFacture error: ' . $e->getMessage());
+    }
+
     $controller->redirect('index.php?action=orders');
 }
 
@@ -138,7 +194,7 @@ function placeOrder()
     }
 
     if (!isset($_SESSION['user'])) {
-        $controller->redirect('index.php?action=login');
+        $controller->redirect('index.php?action=login&next=checkout');
         return;
     }
 
@@ -156,9 +212,29 @@ function placeOrder()
     if ($orderId) {
         $order      = $orderModel->getOrderWithDetails($orderId);
         $orderItems = $orderModel->getOrderItems($orderId);
+        $orderNumber = $orderModel->getUserOrderSequence($orderId) ?? $orderId;
         CartModel::clearCart();
+        // Envoi automatique de la facture et notifications
+        $clientEmail = $_SESSION['user']['email'] ?? ($order['customer_email'] ?? '');
+        if (!empty($clientEmail) && filter_var($clientEmail, FILTER_VALIDATE_EMAIL)) {
+            sendInvoiceEmail($orderId, $clientEmail);
+        }
+
+        try {
+            notifierEleveurNouvelleCommande($order);
+        } catch (Exception $e) {
+            error_log('[placeOrder] notifierEleveurNouvelleCommande error: ' . $e->getMessage());
+        }
+
+        try {
+            notifierClientFacture($order, $_SESSION['user']);
+        } catch (Exception $e) {
+            error_log('[placeOrder] notifierClientFacture error: ' . $e->getMessage());
+        }
+
         $controller->render('cart/confirmation.php', [
             'orderId'    => $orderId,
+            'orderNumber' => $orderNumber,
             'order'      => $order,
             'orderItems' => $orderItems,
         ]);
@@ -175,14 +251,46 @@ function orderHistory()
     $controller = new Controller();
 
     if (!isset($_SESSION['user'])) {
-        $controller->redirect('index.php?action=login');
+        $controller->redirect('index.php?action=login&next=orders');
         return;
     }
 
     $orderModel = new OrderModel();
     $orders     = $orderModel->getByUser($_SESSION['user']['id']);
 
+    foreach ($orders as &$order) {
+        $order['order_number'] = $orderModel->getUserOrderSequence(intval($order['id'] ?? 0)) ?? intval($order['id'] ?? 0);
+    }
+    unset($order);
+
     $controller->render('cart/orders.php', ['orders' => $orders]);
+}
+
+function clearOrderHistory()
+{
+    $controller = new Controller();
+
+    if (!isset($_SESSION['user'])) {
+        $controller->redirect('index.php?action=login&next=orders');
+        return;
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $_SESSION['error'] = 'Requête invalide ou jeton CSRF manquant.';
+        $controller->redirect('index.php?action=orders');
+        return;
+    }
+
+    $orderModel = new OrderModel();
+    if ($orderModel->deleteByUser($_SESSION['user']['id'])) {
+        $_SESSION['success'] = 'Historique des commandes effacé. Vos prochaines commandes commenceront à #1.';
+    } else {
+        $lastError = method_exists($orderModel, 'getLastError') ? $orderModel->getLastError() : '';
+        error_log('[clearOrderHistory] deleteByUser failed: ' . $lastError);
+        $_SESSION['error'] = 'Impossible d\'effacer l\'historique des commandes. Réessayez plus tard.';
+    }
+
+    $controller->redirect('index.php?action=orders');
 }
 
 function viewOrder($id)
@@ -190,23 +298,25 @@ function viewOrder($id)
     $controller = new Controller();
 
     if (!isset($_SESSION['user'])) {
-        $controller->redirect('index.php?action=login');
+        $controller->redirect('index.php?action=login&next=orders');
         return;
     }
 
     $orderModel = new OrderModel();
     $order      = $orderModel->getOrderWithDetails($id);
 
-    if (!$order || $order['user_id'] !== $_SESSION['user']['id']) {
+    if (!$order || intval($order['user_id']) !== intval($_SESSION['user']['id'])) {
         header('HTTP/1.0 404 Not Found');
         echo 'Commande introuvable.';
         exit;
     }
 
     $orderItems = $orderModel->getOrderItems($id);
+    $orderNumber = $orderModel->getUserOrderSequence($id) ?? $id;
     $controller->render('cart/order_detail.php', [
         'order'      => $order,
         'orderItems' => $orderItems,
+        'orderNumber' => $orderNumber,
     ]);
 }
 
@@ -215,7 +325,7 @@ function markOrderDelivered()
     $controller = new Controller();
 
     if (!isset($_SESSION['user'])) {
-        $controller->redirect('index.php?action=login');
+        $controller->redirect('index.php?action=login&next=orders');
         return;
     }
 
@@ -281,6 +391,13 @@ function generateInvoicePDFBytes($orderId, $orderDetails, $orderItems, $orderNum
     $deliveryType  = ($orderDetails['delivery_type'] ?? '') === 'home'
         ? 'Livraison a domicile'
         : 'Retrait en boutique';
+    // Données livreur et métadonnées additionnelles
+    $deliveryPersonName  = htmlspecialchars($orderDetails['delivery_person_name'] ?? '');
+    $deliveryPersonPhone = htmlspecialchars($orderDetails['delivery_person_phone'] ?? '');
+    $deliveryPersonEmail = htmlspecialchars($orderDetails['delivery_person_email'] ?? '');
+    $failedReason        = htmlspecialchars($orderDetails['failed_reason'] ?? '');
+    $latitude            = htmlspecialchars($orderDetails['latitude'] ?? '');
+    $longitude           = htmlspecialchars($orderDetails['longitude'] ?? '');
 
     // ── Lignes articles ──
     $subtotal  = 0;
@@ -479,13 +596,18 @@ function generateInvoicePDFBytes($orderId, $orderDetails, $orderItems, $orderNum
       <div class="info-line">{$customerPhone}</div>
       <div class="info-line">{$customerAddr}</div>
     </div>
-    <div class="info-right">
-      <div class="cell-title">Details commande</div>
-      <div class="info-line"><strong>Ref.</strong> #CMD-{$orderId}</div>
-      <div class="info-line"><strong>Date</strong> {$invoiceDate}</div>
-      <div class="info-line"><strong>Livraison</strong> {$deliveryType}</div>
-      <div class="info-line"><strong>Articles</strong> {$itemCount}</div>
-    </div>
+        <div class="info-right">
+            <div class="cell-title">Details commande</div>
+            <div class="info-line"><strong>Ref.</strong> #CMD-{$orderId}</div>
+            <div class="info-line"><strong>Date</strong> {$invoiceDate}</div>
+            <div class="info-line"><strong>Livraison</strong> {$deliveryType}</div>
+            <div class="info-line"><strong>Articles</strong> {$itemCount}</div>
+            <div class="info-line"><strong>Livreur</strong> {$deliveryPersonName}</div>
+            <div class="info-line"><strong>Tél. livreur</strong> {$deliveryPersonPhone}</div>
+            <div class="info-line"><strong>Email livreur</strong> {$deliveryPersonEmail}</div>
+            <div class="info-line"><strong>Coordonnées</strong> Lat: {$latitude} Lon: {$longitude}</div>
+            <div class="info-line"><strong>Raison échec</strong> {$failedReason}</div>
+        </div>
   </div>
 
   <!-- ARTICLES -->
@@ -577,7 +699,24 @@ function downloadInvoice()
     $orderModel = new OrderModel();
     $order      = $orderModel->getById($orderId);
 
-    if (!$order || $order['user_id'] !== $_SESSION['user']['id']) {
+    // Allow download for the order owner, the farmer for that order, the assigned delivery person, or admins
+    $allowed = false;
+    $sessionUserId = intval($_SESSION['user']['id'] ?? 0);
+    $sessionRole = $_SESSION['user']['role'] ?? '';
+    if ($order && intval($order['user_id']) === $sessionUserId) {
+        $allowed = true;
+    }
+    if (!$allowed && $sessionRole === 'farmer' && intval($order['farmer_id'] ?? 0) === $sessionUserId) {
+        $allowed = true;
+    }
+    if (!$allowed && $sessionRole === 'delivery' && intval($order['delivery_person_id'] ?? 0) === $sessionUserId) {
+        $allowed = true;
+    }
+    if (!$allowed && $sessionRole === 'admin') {
+        $allowed = true;
+    }
+
+    if (!$order || !$allowed) {
         header('HTTP/1.0 404 Not Found');
         exit;
     }
@@ -634,13 +773,27 @@ function sendInvoiceEmail($orderId, $recipientEmail)
         }
         $mail->Port = MAIL_PORT;
 
-        $mail->setFrom(MAIL_FROM_EMAIL, MAIL_FROM_NAME);
+        $senderEmail = MAIL_FROM_EMAIL ?: MAIL_USERNAME;
+        $senderName  = MAIL_FROM_NAME ?: 'FarmMarket';
+
+        $mail->setFrom($senderEmail, $senderName);
+        $mail->Sender = $senderEmail;
         $mail->addAddress($recipientEmail);
-        $mail->addReplyTo(MAIL_FROM_EMAIL, MAIL_FROM_NAME);
+        $mail->addReplyTo($senderEmail, $senderName);
+        $mail->addCustomHeader('X-Mailer', 'FarmMarket Mailer');
+        $mail->Priority = 3;
+        $mail->Timeout = 10;
 
         $mail->Subject = 'Confirmation de commande FarmMarket #' . $orderId;
         $mail->isHTML(true);
         $mail->CharSet = 'UTF-8';
+        $mail->SMTPOptions = [
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+                'allow_self_signed' => false,
+            ],
+        ];
 
         $mail->Body    = generateInvoiceHTML($orderId, $orderDetails, $orderItems, $orderNumber);
         $mail->AltBody = generateInvoiceText($orderId, $orderDetails, $orderItems, $orderNumber);
@@ -674,6 +827,72 @@ function sendInvoiceEmail($orderId, $recipientEmail)
 }
 
 /**
+ * Envoie un email simple (HTML + alt) en réutilisant la config PHPMailer
+ */
+function sendSimpleEmail($toEmail, $subject, $htmlBody, $altBody = '')
+{
+    if (empty($toEmail) || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+
+    try {
+        if (!file_exists(__DIR__ . '/../vendor/autoload.php')) {
+            throw new Exception('vendor/autoload.php not found. Run: composer install');
+        }
+        require_once __DIR__ . '/../vendor/autoload.php';
+        require_once __DIR__ . '/../config/mail.php';
+
+        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+        $mail->isSMTP();
+        $mail->SMTPDebug   = defined('MAIL_DEBUG') ? MAIL_DEBUG : 0;
+        $mail->Debugoutput = 'error_log';
+        $mail->Host        = MAIL_HOST;
+        $mail->SMTPAuth    = true;
+        $mail->Username    = MAIL_USERNAME;
+        $mail->Password    = MAIL_PASSWORD;
+        $mail->Port        = MAIL_PORT;
+        if (defined('MAIL_ENCRYPTION') && strtolower(MAIL_ENCRYPTION) === 'ssl') {
+            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+        } else {
+            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        }
+
+        $senderEmail = MAIL_FROM_EMAIL ?: MAIL_USERNAME;
+        $senderName  = MAIL_FROM_NAME ?: 'FarmMarket';
+
+        $mail->setFrom($senderEmail, $senderName);
+        $mail->Sender = $senderEmail;
+        $mail->addAddress($toEmail);
+        $mail->addReplyTo($senderEmail, $senderName);
+        $mail->addCustomHeader('X-Mailer', 'FarmMarket Mailer');
+        $mail->Priority = 3;
+        $mail->Timeout = 10;
+        $mail->Subject = $subject;
+        $mail->isHTML(true);
+        $mail->CharSet = 'UTF-8';
+        $mail->Body    = $htmlBody;
+        $mail->AltBody = $altBody ?: strip_tags($htmlBody);
+        $mail->SMTPOptions = [
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+                'allow_self_signed' => false,
+            ],
+        ];
+
+        return $mail->send();
+    } catch (Exception $e) {
+        error_log('[sendSimpleEmail] Exception: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Envoie notifications email + SMS au client et aux livreurs lors d'une nouvelle commande
+ */
+// sendOrderNotifications removed: duplicate of NotificationService responsibilities.
+
+/**
  * Génère le HTML de la facture pour l'email
  */
 function generateInvoiceHTML($orderId, $orderDetails, $orderItems, $orderNumber = null)
@@ -689,6 +908,14 @@ function generateInvoiceHTML($orderId, $orderDetails, $orderItems, $orderNumber 
     $deliveryMode         = ($orderDetails['delivery_type'] ?? '') === 'home'
         ? 'Livraison à domicile' : 'Retrait en boutique';
     $deliveryAddr         = nl2br(htmlspecialchars($orderDetails['address'] ?? 'Non spécifiée'));
+
+    // Données livreur pour l'email
+    $deliveryPersonNameEmail  = htmlspecialchars($orderDetails['delivery_person_name'] ?? '');
+    $deliveryPersonPhoneEmail = htmlspecialchars($orderDetails['delivery_person_phone'] ?? '');
+    $deliveryPersonEmailAddr  = htmlspecialchars($orderDetails['delivery_person_email'] ?? '');
+    $failedReasonEmail        = htmlspecialchars($orderDetails['failed_reason'] ?? '');
+    $latitudeEmail            = htmlspecialchars($orderDetails['latitude'] ?? '');
+    $longitudeEmail           = htmlspecialchars($orderDetails['longitude'] ?? '');
 
     $subtotal = 0;
     foreach ($orderItems as $item) {
@@ -777,6 +1004,11 @@ HTML;
             <div class="section-title">Informations de livraison</div>
             <div class="info-row"><span class="info-label">Mode :</span><span>{$deliveryMode}</span></div>
             <div class="info-row"><span class="info-label">Adresse :</span><span>{$deliveryAddr}</span></div>
+            <div class="info-row"><span class="info-label">Livreur :</span><span>{$deliveryPersonNameEmail}</span></div>
+            <div class="info-row"><span class="info-label">Téléphone livreur :</span><span>{$deliveryPersonPhoneEmail}</span></div>
+            <div class="info-row"><span class="info-label">Email livreur :</span><span>{$deliveryPersonEmailAddr}</span></div>
+            <div class="info-row"><span class="info-label">Coordonnées :</span><span>Lat: {$latitudeEmail} Lon: {$longitudeEmail}</span></div>
+            <div class="info-row"><span class="info-label">Raison échec :</span><span>{$failedReasonEmail}</span></div>
         </div>
 
         <div style="text-align:center;">
@@ -846,6 +1078,11 @@ function generateInvoiceText($orderId, $orderDetails, $orderItems, $orderNumber 
     $lines[] = '--- LIVRAISON ---';
     $lines[] = 'Mode    : ' . (($orderDetails['delivery_type'] ?? '') === 'home' ? 'Livraison a domicile' : 'Retrait en boutique');
     $lines[] = 'Adresse : ' . ($orderDetails['address'] ?? 'Non specifiee');
+    $lines[] = 'Livreur : ' . ($orderDetails['delivery_person_name'] ?? 'N/A');
+    $lines[] = 'Tel livreur : ' . ($orderDetails['delivery_person_phone'] ?? 'N/A');
+    $lines[] = 'Email livreur : ' . ($orderDetails['delivery_person_email'] ?? 'N/A');
+    $lines[] = 'Coordonnees : Lat: ' . ($orderDetails['latitude'] ?? '') . ' Lon: ' . ($orderDetails['longitude'] ?? '');
+    $lines[] = 'Raison echec : ' . ($orderDetails['failed_reason'] ?? '');
     $lines[] = '';
     $lines[] = 'Telecharger la facture PDF :';
     $lines[] = $baseUrl . '/index.php?action=order/invoice&id=' . $orderId;
@@ -855,4 +1092,58 @@ function generateInvoiceText($orderId, $orderDetails, $orderItems, $orderNumber 
     $lines[] = '=======================================';
 
     return implode("\n", $lines);
+}
+
+function reportFailure()
+{
+    $controller = new Controller();
+
+    if (!isset($_SESSION['user'])) {
+        $controller->redirect('index.php?action=login');
+        return;
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $controller->redirect('index.php?action=orders');
+        return;
+    }
+
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $_SESSION['error'] = 'Jeton CSRF invalide.';
+        $controller->redirect('index.php?action=orders');
+        return;
+    }
+
+    $orderId = intval($_POST['order_id'] ?? 0);
+    $reason  = trim($_POST['reason'] ?? '');
+
+    if ($orderId <= 0) {
+        header('HTTP/1.0 400 Bad Request');
+        exit;
+    }
+
+    $orderModel = new OrderModel();
+    $order = $orderModel->getById($orderId);
+
+    if (!$order || $order['user_id'] !== $_SESSION['user']['id']) {
+        header('HTTP/1.0 404 Not Found');
+        exit;
+    }
+
+    // Only allow reporting failure if order is not already delivered/failed
+    if (normalizeStatus($order['status']) === 'delivered' || isFailedStatus($order['status'])) {
+        $_SESSION['error'] = 'Le statut de cette commande ne peut pas être modifié.';
+        $controller->redirect('index.php?action=order/view&id=' . $orderId);
+        return;
+    }
+
+    // Mark as failed and save reason
+    if ($orderModel->updateOrderStatus($orderId, 'failed')) {
+        $orderModel->updateFailedReason($orderId, $reason ?: 'Signalé par le client');
+        $_SESSION['success'] = 'Commande signalée comme échouée.';
+    } else {
+        $_SESSION['error'] = 'Impossible de signaler l’échec de la commande.';
+    }
+
+    $controller->redirect('index.php?action=order/view&id=' . $orderId);
 }
