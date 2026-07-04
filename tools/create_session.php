@@ -1,4 +1,9 @@
 <?php
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit('Accès interdit');
+}
+
 $sid = $argv[1] ?? 'simsession';
 $save = ini_get('session.save_path') ?: sys_get_temp_dir();
 if (!is_dir($save)) mkdir($save, 0777, true);

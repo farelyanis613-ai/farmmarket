@@ -1,4 +1,9 @@
 <?php
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit('Accès interdit');
+}
+
 /**
  * Script de test de connexion SMTP (PHPMailer + Gmail)
  * 
