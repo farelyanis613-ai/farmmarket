@@ -1,641 +1,157 @@
-<?php require __DIR__ . '/../partials/header.php'; ?>
+﻿<?php require __DIR__ . '/../partials/header.php'; ?>
 <?php
-    $operator        = trim($_GET['operator'] ?? 'Moov Money');
-    $deliveryAddress = trim($_GET['address'] ?? $_SESSION['user']['address'] ?? '');
+$operator        = trim($_GET['operator'] ?? ($_SESSION['old_operator'] ?? 'Moov Money'));
+$deliveryAddress = trim($_GET['address'] ?? ($_SESSION['old_delivery_address'] ?? $_SESSION['user']['address'] ?? ''));
+$deliveryType    = trim($_GET['delivery_type'] ?? 'home');
+$deliveryFee     = intval($_GET['delivery_fee'] ?? 0);
+$phoneNumber     = trim($_SESSION['old_phone_number'] ?? '');
+$subtotal        = floatval($subtotal ?? 0);
+$total           = floatval($total ?? ($subtotal + $deliveryFee));
 
-    $operators = [
-        'Moov Money'   => ['color'=>'#0066CC','bg'=>'#E6F0FB','logo'=>'M'],
-        'MTN mobile'   => ['color'=>'#F5A623','bg'=>'#FEF3DC','logo'=>'M'],
-        'Celtiis Cash' => ['color'=>'#E01B24','bg'=>'#FDEAEA','logo'=>'C'],
-    ];
+if (isset($_SESSION['old_operator'])) {
+    unset($_SESSION['old_operator']);
+}
+if (isset($_SESSION['old_delivery_address'])) {
+    unset($_SESSION['old_delivery_address']);
+}
+if (isset($_SESSION['old_phone_number'])) {
+    unset($_SESSION['old_phone_number']);
+}
+
+$operators = [
+    'Moov Money'   => ['color' => '#0066CC', 'bg' => '#E6F0FB', 'logo' => 'M'],
+    'MTN mobile'   => ['color' => '#F5A623', 'bg' => '#FEF3DC', 'logo' => 'M'],
+    'Celtiis Cash' => ['color' => '#E01B24', 'bg' => '#FDEAEA', 'logo' => 'C'],
+];
+$operatorMeta   = $operators[$operator] ?? ['color' => '#16a34a', 'bg' => '#E5F3E9', 'logo' => 'M'];
+$isHomeDelivery = $deliveryType === 'home';
 ?>
 
-<!-- ═══════════════════════════════════════════════
-     LEAFLET CSS — OpenStreetMap (gratuit, aucune clé)
-════════════════════════════════════════════════ -->
-<link rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-      crossorigin="">
-
 <div class="fm-pay-wrap pb-16">
-
-    <!-- ── En-tête ──────────────────────────────── -->
     <div class="fm-pay-header">
         <a href="index.php?action=checkout" class="fm-back-link">← Retour</a>
         <div>
             <h1 class="fm-page-title">Paiement Mobile Money</h1>
-            <p class="fm-page-sub">Complétez les informations ci-dessous pour valider votre commande.</p>
+            <p class="fm-page-sub">Choisissez votre livraison et confirmez votre paiement mobile.</p>
         </div>
     </div>
 
-    <!-- ── Barre de progression ──────────────────── -->
-    <div class="fm-checkout-steps" aria-label="Étapes du paiement">
-        <div class="fm-cstep fm-cstep-done">
-            <div class="fm-cstep-dot">✓</div>
-            <span class="fm-cstep-label">Panier</span>
-        </div>
-        <div class="fm-cstep-line fm-cstep-line-done"></div>
-        <div class="fm-cstep fm-cstep-done">
-            <div class="fm-cstep-dot">✓</div>
-            </div>
-        <aside class="fm-pay-right">
-            <div class="fm-recap-card">
-                <h2 class="fm-recap-title">Récapitulatif</h2>
-
+    <div class="fm-pay-grid">
+        <main>
+            <?php if (!empty($_SESSION['error'])) : ?>
+                <div class="fm-field-card" style="border-color:#f87171; background:#fef2f2; color:#b91c1c;">
+                    <p><strong>Erreur :</strong> <?= htmlspecialchars($_SESSION['error']) ?></p>
+                </div>
+                <?php unset($_SESSION['error']); ?>
+            <?php endif; ?>
+            <div class="fm-field-card">
+                <h2 class="section-title">Résumé de la commande</h2>
                 <div class="fm-recap-rows">
                     <div class="fm-recap-row">
                         <span class="fm-recap-label">Sous-total</span>
-                        <span class="fm-recap-val"><?= number_format(($total ?? 0) - ($deliveryFee ?? 0), 0, '', ' ') ?> FCFA</span>
+                        <span class="fm-recap-val"><?= number_format($subtotal, 0, '', ' ') ?> FCFA</span>
                     </div>
                     <div class="fm-recap-row">
-                        <span class="fm-recap-label">Frais de livraison</span>
-                        <span class="fm-recap-val">
-                            <?php if (($deliveryFee ?? 0) > 0) : ?>
-                                <?= number_format($deliveryFee, 0, '', ' ') ?> FCFA
-                            <?php else : ?>
-                                <span class="fm-free">Gratuit</span>
-                            <?php endif; ?>
-                        </span>
+                        <span class="fm-recap-label">Livraison</span>
+                        <span class="fm-recap-val"><?= $deliveryFee > 0 ? number_format($deliveryFee, 0, '', ' ') . ' FCFA' : '<span class="fm-free">Gratuit</span>' ?></span>
                     </div>
                     <div class="fm-recap-row fm-recap-total">
                         <span>Total à payer</span>
-                        <span><?= number_format($total ?? 0, 0, '', ' ') ?> FCFA</span>
+                        <span><?= number_format($total, 0, '', ' ') ?> FCFA</span>
                     </div>
                 </div>
+            </div>
 
-                <!-- Opérateur -->
-                <div class="fm-recap-op" id="recapOp">
-                    <span class="fm-recap-op-icon" id="recapOpIcon"
-                          style="background:<?= $operators[$operator]['color'] ?? '#16a34a' ?>">
-                        <?= $operators[$operator]['logo'] ?? 'M' ?>
-                    </span>
+            <form id="mobilePayForm" action="index.php?action=checkout/complete" method="post" class="fm-field-card">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(getCsrfToken()) ?>">
+                <input type="hidden" name="delivery_type" value="<?= htmlspecialchars($deliveryType) ?>">
+                <input type="hidden" name="delivery_fee" value="<?= $deliveryFee ?>">
+                <input type="hidden" name="delivery_latitude" value="<?= htmlspecialchars($deliveryLatitude ?? '') ?>">
+                <input type="hidden" name="delivery_longitude" value="<?= htmlspecialchars($deliveryLongitude ?? '') ?>">
+                <input type="hidden" name="operator" id="operatorInput" value="<?= htmlspecialchars($operator) ?>">
+
+                <h2 class="section-title">Mode de livraison</h2>
+                <?php if ($isHomeDelivery) : ?>
+                    <p class="fm-field-hint">Adresse de livraison sélectionnée pour cette commande.</p>
+                    <label class="fm-field-label" for="deliveryAddress">Adresse de livraison</label>
+                    <input id="deliveryAddress" name="delivery_address" type="text" class="fm-input" value="<?= htmlspecialchars($deliveryAddress) ?>" placeholder="Ex : Cotonou, Akossavié" readonly>
+                    <?php if ($deliveryAddress === '') : ?>
+                        <p class="fm-field-hint" style="margin-top:0.75rem;">Aucune adresse fournie. Retournez à l'étape précédente pour choisir votre lieu de livraison.</p>
+                    <?php endif; ?>
+                <?php else : ?>
+                    <div class="fm-delivery-card fm-delivery-selected" style="border-color:#16a34a;background:#f0fdf4;">
+                        <div class="fm-delivery-icon">🏪</div>
+                        <div class="fm-delivery-info">
+                            <p class="fm-delivery-name">Retrait en boutique</p>
+                            <p class="fm-delivery-desc">Récupérez votre commande à Hévié Akossavié.</p>
+                        </div>
+                    </div>
+                    <p class="fm-field-hint" style="margin-top:0.85rem;">Retrait en boutique choisi : aucun frais de livraison.</p>
+                <?php endif; ?>
+
+                <h2 class="section-title" style="margin-top:1.5rem;">Opérateur Mobile Money</h2>
+                <div class="fm-operator-pills">
+                    <?php foreach ($operators as $name => $data) : ?>
+                        <button type="button" class="fm-op-pill <?= $name === $operator ? 'fm-op-active' : '' ?>" data-op="<?= htmlspecialchars($name) ?>" style="--op-color:<?= $data['color'] ?>; --op-bg:<?= $data['bg'] ?>;">
+                            <span class="fm-op-logo" style="background:<?= $data['color'] ?>"><?= htmlspecialchars($data['logo']) ?></span>
+                            <?= htmlspecialchars($name) ?>
+                            <span class="fm-op-check">✓</span>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+
+                <label class="fm-field-label" for="phoneNumber" style="margin-top:1rem;">Numéro Mobile Money</label>
+                <p class="fm-field-hint" style="margin-top:0.5rem;">Format : +229 01 XX XX XX XX</p>
+                <div class="fm-phone-wrap">
+                    <input id="phoneNumber" name="phone_number" type="tel" class="fm-input fm-input-phone" placeholder="+229 01 XX XX XX XX" pattern="^\+229(?:\s?\d){10}$" title="Format attendu : +229 01 XX XX XX XX" value="<?= htmlspecialchars(formatPhoneDisplay($phoneNumber)) ?>" required>
+                </div>
+
+                <button id="payBtn" type="submit" class="btn-primary" style="margin-top:1.5rem;width:100%;">Payer <?= number_format($total, 0, '', ' ') ?> FCFA</button>
+            </form>
+        </main>
+
+        <aside class="fm-co-right">
+            <div class="fm-recap-card section-card">
+                <h2 class="section-title fm-recap-title">Récapitulatif</h2>
+                <div class="fm-recap-rows">
+                    <div class="fm-recap-row"><span>Sous-total</span><span><?= number_format($subtotal, 0, '', ' ') ?> FCFA</span></div>
+                    <div class="fm-recap-row"><span>Livraison</span><span><?= $deliveryFee > 0 ? number_format($deliveryFee, 0, '', ' ') . ' FCFA' : 'Gratuit' ?></span></div>
+                    <div class="fm-recap-row fm-recap-total"><span>Total</span><span><?= number_format($total, 0, '', ' ') ?> FCFA</span></div>
+                </div>
+                <div class="fm-recap-op" style="margin-top:1rem;">
+                    <span class="fm-recap-op-icon" id="recapOpIcon" style="background:<?= $operatorMeta['color'] ?>;"><?= htmlspecialchars($operatorMeta['logo']) ?></span>
                     <div>
                         <p class="fm-recap-op-name" id="recapOpName"><?= htmlspecialchars($operator) ?></p>
                         <p class="fm-recap-op-sub">Paiement sécurisé</p>
                     </div>
                     <span class="fm-secure-icon">🔒</span>
                 </div>
-
-                <!-- Bloc GPS sidebar (caché jusqu'à localisation) -->
-                <div id="gpsRecapBlock" class="fm-gps-recap" style="display:none;">
-                    <div class="fm-gps-recap-head">
-                        <span class="fm-gps-dot"></span>
-                        Position GPS enregistrée
-                    </div>
-                    <div id="gpsRecapCoords" class="fm-gps-recap-coords">—</div>
-                </div>
-
-                <ul class="fm-guarantees">
-                    <li>✅ Paiement 100% sécurisé</li>
+                <ul class="fm-guarantees" style="margin-top:1rem;">
+                    <li>✅ Paiement sécurisé</li>
                     <li>✅ Confirmation par SMS</li>
-                    <li>✅ Facture téléchargeable</li>
-                    <li>✅ Livraison GPS tracée</li>
+                    <li>✅ Facture disponible</li>
+                    <li>✅ Suivi de la commande</li>
                 </ul>
             </div>
         </aside>
     </div>
 </div>
 
-<!-- Inline styles moved to public/css/style.css -->
-<!-- views/cart/checkout_mobile.php: original <style> block consolidated into public/css/style.css -->
-
-<!-- ═══════════════════════════════════════
-     LEAFLET JS
-════════════════════════════════════════ -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs="
-        crossorigin=""></script>
-
-<!-- ═══════════════════════════════════════
-     GPS + CARTE + FORMULAIRE
-════════════════════════════════════════ -->
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-
-    /* ════════════════════════════════════════
-       1. SÉLECTION OPÉRATEUR
-    ════════════════════════════════════════ */
-    var opData = {
-        'Moov Money':   { color:'#0066CC', bg:'#E6F0FB', logo:'M' },
-        'MTN mobile':   { color:'#F5A623', bg:'#FEF3DC', logo:'M' },
-        'Celtiis Cash': { color:'#E01B24', bg:'#FDEAEA', logo:'C' },
-    };
-    document.querySelectorAll('.fm-op-pill').forEach(function (pill) {
-        pill.addEventListener('click', function () {
-            document.querySelectorAll('.fm-op-pill').forEach(function (p) { p.classList.remove('fm-op-active'); });
-            pill.classList.add('fm-op-active');
-            var op = pill.dataset.op;
-            document.getElementById('operatorInput').value = op;
-            document.getElementById('opNameHint').textContent = op;
-            var d = opData[op] || {};
-            var icon  = document.getElementById('recapOpIcon');
-            var oname = document.getElementById('recapOpName');
-            if (icon)  { icon.style.background = d.color || '#16a34a'; icon.textContent = d.logo || 'M'; }
-            if (oname) { oname.textContent = op; }
+(function () {
+    var operatorButtons = document.querySelectorAll('.fm-op-pill');
+    operatorButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            operatorButtons.forEach(function (btn) { btn.classList.remove('fm-op-active'); });
+            button.classList.add('fm-op-active');
+            var selected = button.dataset.op;
+            var operatorInput = document.getElementById('operatorInput');
+            if (operatorInput) operatorInput.value = selected;
+            var recapName = document.getElementById('recapOpName');
+            if (recapName) recapName.textContent = selected;
         });
     });
-
-    /* ════════════════════════════════════════
-       2. TOGGLE EMAIL
-    ════════════════════════════════════════ */
-    var cb = document.getElementById('receiptEmailCheckbox');
-    var emailContainer = document.getElementById('receiptEmailContainer');
-    var emailInput = document.getElementById('receiptEmail');
-    if (cb && emailContainer) {
-        cb.addEventListener('change', function () {
-            emailContainer.classList.toggle('open', cb.checked);
-            if (emailInput) cb.checked ? emailInput.setAttribute('required','') : emailInput.removeAttribute('required');
-        });
-    }
-
-    /* ════════════════════════════════════════
-       3. CARTE GPS LEAFLET
-    ════════════════════════════════════════ */
-    var mapContainer = document.getElementById('checkoutAddressMap');
-    if (!mapContainer) return; // Mode retrait en boutique : pas de carte
-
-    // Références DOM
-    var addrInput   = document.getElementById('deliveryAddress');
-    var latInput    = document.getElementById('gpsLat');
-    var lngInput    = document.getElementById('gpsLng');
-    var statusBar   = document.getElementById('gpsStatusBar');
-    var gpsBtn      = document.getElementById('gpsLocateBtn');
-    var gpsBtnLabel = document.getElementById('gpsBtnLabel');
-    var recapBlock  = document.getElementById('gpsRecapBlock');
-    var recapCoords = document.getElementById('gpsRecapCoords');
-
-    // Centre : Cotonou, Bénin
-    var DEFAULT_LAT  = 6.3654;
-    var DEFAULT_LNG  = 2.4183;
-    var DEFAULT_ZOOM = 14;
-
-    // ── Init carte ────────────────────────────
-    var map = L.map('checkoutAddressMap').setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-    }).addTo(map);
-
-    // ── Icône marqueur personnalisé ───────────
-    var pinIcon = L.divIcon({
-        className: '',
-        html: '<div style="width:32px;height:32px;border-radius:50%;background:#16a34a;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:14px;">📍</div>',
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -34],
-    });
-
-    // ── Marqueur (draggable) ──────────────────
-    var marker = L.marker([DEFAULT_LAT, DEFAULT_LNG], { icon: pinIcon, draggable: true }).addTo(map);
-    marker.bindPopup('<b>Point de livraison</b><br><small>Glissez pour ajuster</small>').openPopup();
-
-    // ── Helpers ──────────────────────────────
-    function setCoords(lat, lng) {
-        latInput.value = lat.toFixed(6);
-        lngInput.value = lng.toFixed(6);
-        // Mettre à jour sidebar
-        if (recapBlock) recapBlock.style.display = 'block';
-        if (recapCoords) recapCoords.textContent = 'Lat : ' + lat.toFixed(5) + '   Lng : ' + lng.toFixed(5);
-    }
-
-    function showStatus(msg, type) {
-        // type : 'searching' | 'success' | 'warning' | 'error'
-        statusBar.className = 'fm-gps-status ' + type;
-        statusBar.textContent = msg;
-        statusBar.style.display = 'block';
-        if (type === 'success') {
-            setTimeout(function () { statusBar.style.display = 'none'; }, 3500);
-        }
-    }
-
-    // ── Géocodage inverse (coords → adresse) ─
-    function reverseGeocode(lat, lng) {
-        fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json', {
-            headers: { 'Accept-Language': 'fr' }
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-            if (d && d.address && addrInput) {
-                var parts = [
-                    d.address.road,
-                    d.address.neighbourhood || d.address.suburb,
-                    d.address.city || d.address.town || d.address.village,
-                ].filter(Boolean);
-                addrInput.value = parts.length ? parts.join(', ') : (d.display_name || '').split(',').slice(0, 3).join(', ');
-            }
-        })
-        .catch(function () { /* silencieux si pas de réseau */ });
-    }
-
-    // ── Drag marqueur ─────────────────────────
-    marker.on('dragend', function () {
-        var ll = marker.getLatLng();
-        setCoords(ll.lat, ll.lng);
-        reverseGeocode(ll.lat, ll.lng);
-        showStatus('📍 Position mise à jour', 'success');
-    });
-
-    // ── Clic sur la carte ─────────────────────
-    map.on('click', function (e) {
-        marker.setLatLng(e.latlng);
-        map.panTo(e.latlng);
-        setCoords(e.latlng.lat, e.latlng.lng);
-        reverseGeocode(e.latlng.lat, e.latlng.lng);
-        marker.openPopup();
-        showStatus('📍 Position sélectionnée', 'success');
-    });
-
-    // ── Géocodage adresse saisie → carte ──────
-    var geocodeTimer = null;
-    function geocodeAddress(address) {
-        if (!address || address.length < 4) return;
-        showStatus('🔍 Recherche de l\'adresse…', 'searching');
-        fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(address + ', Bénin') + '&format=json&limit=1', {
-            headers: { 'Accept-Language': 'fr' }
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (results) {
-            if (results.length > 0) {
-                var lat = parseFloat(results[0].lat);
-                var lng = parseFloat(results[0].lon);
-                marker.setLatLng([lat, lng]);
-                map.flyTo([lat, lng], 16, { animate: true, duration: 1 });
-                setCoords(lat, lng);
-                showStatus('✅ Adresse trouvée sur la carte', 'success');
-            } else {
-                showStatus('⚠️ Adresse introuvable — cliquez sur la carte pour placer le marqueur', 'warning');
-            }
-        })
-        .catch(function () {
-            showStatus('❌ Erreur réseau — vérifiez votre connexion', 'error');
-        });
-    }
-
-    if (addrInput) {
-        addrInput.addEventListener('input', function () {
-            clearTimeout(geocodeTimer);
-            geocodeTimer = setTimeout(function () { geocodeAddress(addrInput.value); }, 900);
-        });
-    }
-
-    // ── Bouton GPS : géolocalisation navigateur ─
-    if (gpsBtn) {
-        gpsBtn.addEventListener('click', function () {
-            if (!navigator.geolocation) {
-                showStatus('❌ GPS non supporté par votre navigateur', 'error');
-                return;
-            }
-            gpsBtn.disabled = true;
-            gpsBtnLabel.innerHTML = '<span class="spinning">⏳</span> Localisation en cours…';
-            showStatus('📡 Récupération de votre position GPS…', 'searching');
-
-            navigator.geolocation.getCurrentPosition(
-                /* Succès */
-                function (pos) {
-                    var lat = pos.coords.latitude;
-                    var lng = pos.coords.longitude;
-                    marker.setLatLng([lat, lng]);
-                    map.flyTo([lat, lng], 17, { animate: true, duration: 1.2 });
-                    setCoords(lat, lng);
-                    reverseGeocode(lat, lng);
-                    showStatus('✅ Position GPS détectée avec succès !', 'success');
-                    gpsBtn.disabled = false;
-                    gpsBtnLabel.textContent = '✓ Position GPS trouvée';
-                    setTimeout(function () {
-                        gpsBtnLabel.textContent = 'Me localiser automatiquement';
-                    }, 4000);
-                },
-                /* Erreur */
-                function (err) {
-                    var messages = {
-                        1: '⛔ Permission GPS refusée. Autorisez l\'accès dans les paramètres de votre navigateur.',
-                        2: '⚠️ Position GPS indisponible. Vérifiez que votre GPS est activé.',
-                        3: '⏱ Délai GPS dépassé. Réessayez ou cliquez sur la carte.',
-                    };
-                    showStatus(messages[err.code] || '❌ Erreur GPS inconnue', 'error');
-                    gpsBtn.disabled = false;
-                    gpsBtnLabel.textContent = 'Me localiser automatiquement';
-                },
-                /* Options */
-                { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-            );
-        });
-    }
-
-    // ── Géocode l'adresse initiale si présente ─
-    var initialAddr = addrInput ? addrInput.value.trim() : '';
-    if (initialAddr.length > 4) {
-        setTimeout(function () { geocodeAddress(initialAddr); }, 700);
-    } else {
-        // Juste enregistrer le centre par défaut
-        setCoords(DEFAULT_LAT, DEFAULT_LNG);
-    }
-
-    /* ════════════════════════════════════════
-       4. VALIDATION ET SOUMISSION FORMULAIRE
-    ════════════════════════════════════════ */
-    var form   = document.getElementById('mobilePayForm');
-    var payBtn = document.getElementById('payBtn');
-    var payTxt = document.getElementById('payBtnText');
-
-    if (form && payBtn) {
-        form.addEventListener('submit', function (e) {
-            var phone = document.getElementById('phoneNumber');
-            if (phone && phone.value.replace(/\s/g, '').length < 7) {
-                e.preventDefault();
-                phone.style.borderColor = '#dc2626';
-                phone.style.boxShadow   = '0 0 0 3px #fee2e2';
-                phone.focus();
-                return;
-            }
-            payBtn.disabled = true;
-            payBtn.style.background = '#15803d';
-            if (payTxt) payTxt.textContent = '⏳ Traitement en cours…';
-        });
-    }
-});
+})();
 </script>
 
 <?php require __DIR__ . '/../partials/footer.php'; ?>
-
-
-
-
-
-
-
-
-
-cat > /mnt/user-data/outputs/fix_minimal.js << 'EOF'
-/**
- * CORRECTIF CARTE BLANCHE — Leaflet dans layout flex/grid
- *
- * Colle ce bloc dans checkout_mobile_pay.php
- * en remplacement de ton initMap() actuel.
- *
- * Les 3 causes corrigées ici :
- *  1. map.invalidateSize() appelé après 300ms (flex/grid cache la taille réelle)
- *  2. Observer ResizeObserver pour recalculer si le panneau change de taille
- *  3. Le conteneur n'utilise plus la classe CSS mais un style inline height
- */
-
-/* ── Dans ton HTML, remplace le div carte par : ───────────────
-<div id="checkoutAddressMap"
-     style="height:220px;width:100%;border-radius:12px;
-            overflow:hidden;border:1.5px solid #e2e8f0;
-            position:relative;z-index:0;">
-</div>
-──────────────────────────────────────────────────────────── */
-
-/* ── Remplace TOUT ton ancien <script> par celui-ci ───────── */
-
-document.addEventListener('DOMContentLoaded', function () {
-
-    /* ════════════════════════════════════
-       CARTE GPS
-    ════════════════════════════════════ */
-    var mapEl = document.getElementById('checkoutAddressMap');
-    if (mapEl && typeof L !== 'undefined') {
-
-        var addrInput   = document.getElementById('deliveryAddress');
-        var latInput    = document.getElementById('gpsLat');
-        var lngInput    = document.getElementById('gpsLng');
-        var statusBar   = document.getElementById('gpsStatusBar');
-        var gpsBtn      = document.getElementById('gpsLocateBtn');
-        var gpsBtnLabel = document.getElementById('gpsBtnLabel');
-        var recapBlock  = document.getElementById('gpsRecapBlock');
-        var recapCoords = document.getElementById('gpsRecapCoords');
-
-        var LAT = 6.3654, LNG = 2.4183, ZOOM = 14;
-
-        /* Init */
-        var map = L.map('checkoutAddressMap', {
-            center: [LAT, LNG],
-            zoom: ZOOM,
-            zoomControl: true,
-        });
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap',
-            maxZoom: 19,
-        }).addTo(map);
-
-        /* ✅ CORRECTIF 1 : invalider la taille après rendu */
-        setTimeout(function () { map.invalidateSize(); }, 300);
-
-        /* ✅ CORRECTIF 2 : recalculer si layout change (accordion, tabs, etc.) */
-        if (window.ResizeObserver) {
-            var ro = new ResizeObserver(function () { map.invalidateSize(); });
-            ro.observe(mapEl);
-        }
-
-        /* Icône */
-        var pinIcon = L.divIcon({
-            className: '',
-            html: '<div style="width:32px;height:32px;border-radius:50%;background:#16a34a;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:16px;">📍</div>',
-            iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -34],
-        });
-
-        var marker = L.marker([LAT, LNG], { icon: pinIcon, draggable: true }).addTo(map);
-        marker.bindPopup('<b>Point de livraison</b><br><small>Glissez pour ajuster</small>').openPopup();
-
-        /* Helpers */
-        function setCoords(lat, lng) {
-            if (latInput)    latInput.value    = lat.toFixed(6);
-            if (lngInput)    lngInput.value    = lng.toFixed(6);
-            if (recapBlock)  recapBlock.style.display  = 'block';
-            if (recapCoords) recapCoords.textContent   = 'Lat : ' + lat.toFixed(5) + '   Lng : ' + lng.toFixed(5);
-        }
-
-        function showStatus(msg, type) {
-            if (!statusBar) return;
-            statusBar.className    = 'fm-gps-status ' + type;
-            statusBar.textContent  = msg;
-            statusBar.style.display = 'block';
-            if (type === 'success') setTimeout(function () { statusBar.style.display = 'none'; }, 3500);
-        }
-
-        /* Géocodage inverse coords → adresse */
-        function reverseGeocode(lat, lng) {
-            fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json', {
-                headers: { 'Accept-Language': 'fr' }
-            })
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-                if (!d || !d.address || !addrInput) return;
-                var parts = [
-                    d.address.road,
-                    d.address.neighbourhood || d.address.suburb,
-                    d.address.city || d.address.town || d.address.village,
-                ].filter(Boolean);
-                addrInput.value = parts.join(', ') || (d.display_name || '').split(',').slice(0, 3).join(', ');
-            })
-            .catch(function () {});
-        }
-
-        /* Drag */
-        marker.on('dragend', function () {
-            var ll = marker.getLatLng();
-            setCoords(ll.lat, ll.lng);
-            reverseGeocode(ll.lat, ll.lng);
-            showStatus('📍 Position mise à jour', 'success');
-        });
-
-        /* Clic sur la carte */
-        map.on('click', function (e) {
-            marker.setLatLng(e.latlng);
-            map.panTo(e.latlng);
-            setCoords(e.latlng.lat, e.latlng.lng);
-            reverseGeocode(e.latlng.lat, e.latlng.lng);
-            marker.openPopup();
-            showStatus('📍 Position sélectionnée', 'success');
-        });
-
-        /* Géocodage adresse → carte */
-        var geocodeTimer = null;
-        function geocodeAddress(address) {
-            if (!address || address.length < 4) return;
-            showStatus('🔍 Recherche de l\'adresse…', 'searching');
-            fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(address + ', Bénin') + '&format=json&limit=1', {
-                headers: { 'Accept-Language': 'fr' }
-            })
-            .then(function (r) { return r.json(); })
-            .then(function (results) {
-                if (results.length > 0) {
-                    var lat = parseFloat(results[0].lat);
-                    var lng = parseFloat(results[0].lon);
-                    marker.setLatLng([lat, lng]);
-                    map.flyTo([lat, lng], 16, { animate: true, duration: 1 });
-                    setCoords(lat, lng);
-                    showStatus('✅ Adresse localisée sur la carte', 'success');
-                } else {
-                    showStatus('⚠️ Adresse introuvable — cliquez sur la carte', 'warning');
-                }
-            })
-            .catch(function () { showStatus('❌ Erreur réseau', 'error'); });
-        }
-
-        if (addrInput) {
-            addrInput.addEventListener('input', function () {
-                clearTimeout(geocodeTimer);
-                geocodeTimer = setTimeout(function () { geocodeAddress(addrInput.value); }, 900);
-            });
-        }
-
-        /* Bouton GPS */
-        if (gpsBtn) {
-            gpsBtn.addEventListener('click', function () {
-                if (!navigator.geolocation) {
-                    showStatus('❌ GPS non supporté par ce navigateur', 'error');
-                    return;
-                }
-                gpsBtn.disabled = true;
-                if (gpsBtnLabel) gpsBtnLabel.textContent = '⏳ Localisation…';
-                showStatus('📡 Récupération de votre position GPS…', 'searching');
-
-                navigator.geolocation.getCurrentPosition(
-                    function (pos) {
-                        var lat = pos.coords.latitude;
-                        var lng = pos.coords.longitude;
-                        marker.setLatLng([lat, lng]);
-                        map.flyTo([lat, lng], 17, { animate: true, duration: 1.2 });
-                        setCoords(lat, lng);
-                        reverseGeocode(lat, lng);
-                        showStatus('✅ Position GPS détectée !', 'success');
-                        gpsBtn.disabled = false;
-                        if (gpsBtnLabel) {
-                            gpsBtnLabel.textContent = '✓ Position trouvée';
-                            setTimeout(function () {
-                                gpsBtnLabel.textContent = 'Me localiser automatiquement';
-                            }, 4000);
-                        }
-                    },
-                    function (err) {
-                        var msgs = {
-                            1: '⛔ Permission refusée — autorisez dans les paramètres',
-                            2: '⚠️ GPS indisponible — vérifiez votre appareil',
-                            3: '⏱ Délai dépassé — réessayez',
-                        };
-                        showStatus(msgs[err.code] || '❌ Erreur GPS', 'error');
-                        gpsBtn.disabled = false;
-                        if (gpsBtnLabel) gpsBtnLabel.textContent = 'Me localiser automatiquement';
-                    },
-                    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-                );
-            });
-        }
-
-        /* Adresse initiale */
-        var initAddr = addrInput ? addrInput.value.trim() : '';
-        if (initAddr.length > 4) {
-            setTimeout(function () { geocodeAddress(initAddr); }, 800);
-        } else {
-            setCoords(LAT, LNG);
-        }
-    }
-
-    /* ════════════════════════════════════
-       OPÉRATEUR
-    ════════════════════════════════════ */
-    var opData = {
-        'Moov Money':   { color:'#0066CC', logo:'M' },
-        'MTN mobile':   { color:'#F5A623', logo:'M' },
-        'Celtiis Cash': { color:'#E01B24', logo:'C' },
-    };
-    document.querySelectorAll('.fm-op-pill').forEach(function (pill) {
-        pill.addEventListener('click', function () {
-            document.querySelectorAll('.fm-op-pill').forEach(function (p) { p.classList.remove('fm-op-active'); });
-            pill.classList.add('fm-op-active');
-            var op = pill.dataset.op;
-            var inp = document.getElementById('operatorInput');
-            var hint = document.getElementById('opNameHint');
-            var icon = document.getElementById('recapOpIcon');
-            var name = document.getElementById('recapOpName');
-            if (inp)  inp.value = op;
-            if (hint) hint.textContent = op;
-            if (icon) { icon.style.background = opData[op]?.color || '#16a34a'; icon.textContent = opData[op]?.logo || 'M'; }
-            if (name) name.textContent = op;
-        });
-    });
-
-    /* ════════════════════════════════════
-       EMAIL TOGGLE
-    ════════════════════════════════════ */
-    var cb = document.getElementById('receiptEmailCheckbox');
-    var emailBox = document.getElementById('receiptEmailContainer');
-    var emailFld = document.getElementById('receiptEmail');
-    if (cb && emailBox) {
-        cb.addEventListener('change', function () {
-            emailBox.classList.toggle('open', cb.checked);
-            if (emailFld) cb.checked ? emailFld.setAttribute('required','') : emailFld.removeAttribute('required');
-        });
-    }
-
-    /* ════════════════════════════════════
-       VALIDATION FORMULAIRE
-    ════════════════════════════════════ */
-    var form   = document.getElementById('mobilePayForm');
-    var payBtn = document.getElementById('payBtn');
-    var payTxt = document.getElementById('payBtnText');
-    if (form && payBtn) {
-        form.addEventListener('submit', function (e) {
-            var phone = document.getElementById('phoneNumber');
-            if (phone && phone.value.replace(/\s/g,'').length < 7) {
-                e.preventDefault();
-                phone.style.borderColor = '#dc2626';
-                phone.style.boxShadow   = '0 0 0 3px #fee2e2';
-                phone.focus();
-                return;
-            }
-            payBtn.disabled = true;
-            payBtn.style.background = '#15803d';
-            if (payTxt) payTxt.textContent = '⏳ Traitement en cours…';
-        });
-    }
-});
-EOF
-echo "Done"
-Sortie
-

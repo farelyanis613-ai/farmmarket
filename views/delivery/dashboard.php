@@ -160,4 +160,37 @@ window.addEventListener('load', () => {
 });
 </script>
 
+<script type="application/json" id="deliveryAssignmentsData">
+    <?= json_encode(['accepted' => $accepted, 'completed' => $completed, 'failed' => $failed]) ?>
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    let data = {};
+    try { data = JSON.parse(document.getElementById('deliveryAssignmentsData').textContent); } catch (e) { }
+    const computeLocalHash = () => {
+        try {
+            const combined = [].concat(data.accepted || [], data.completed || [], data.failed || []).map(o => ({ id: o.id, status: o.status, delivery_person_id: o.delivery_person_id, failed_reason: o.failed_reason, created_at: o.created_at }));
+            return md5(JSON.stringify(combined));
+        } catch (e) { return ''; }
+    };
+    const md5 = (str) => { let h = 0; for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; } return h.toString(); };
+    let localHash = null;
+    setInterval(async () => {
+        try {
+            const res = await fetch('index.php?action=delivery/assignments-poll', { cache: 'no-store' });
+            if (!res.ok) return;
+            const json = await res.json();
+            if (!json.hash) return;
+            if (localHash === null) {
+                localHash = json.hash;
+                return;
+            }
+            if (json.hash !== localHash) {
+                setTimeout(() => window.location.reload(), 200);
+            }
+        } catch (e) {}
+    }, 8000);
+});
+</script>
+
 <?php require __DIR__ . '/../partials/footer.php'; ?>

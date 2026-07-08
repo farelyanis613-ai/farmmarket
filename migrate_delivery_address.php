@@ -1,4 +1,9 @@
 <?php
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit('Accès interdit');
+}
+
 // Migration: Add delivery_address column to orders table
 
 require_once __DIR__ . '/config/database.php';

@@ -151,6 +151,18 @@ class OrderModel extends Model
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function deleteByUser($userId)
+    {
+        try {
+            $stmt = $this->db->prepare('DELETE FROM orders WHERE user_id = ?');
+            return $stmt->execute([$userId]);
+        } catch (Exception $e) {
+            $this->lastError = $e->getMessage();
+            error_log('[OrderModel::deleteByUser] ' . $e->getMessage());
+            return false;
+        }
+    }
+
     public function findByFarmerId($farmerId)
     {
         $stmt = $this->db->prepare('
@@ -160,7 +172,8 @@ class OrderModel extends Model
                    u.phone AS customer_phone,
                    u.address AS customer_address,
                    d.name  AS delivery_person_name,
-                   d.phone AS delivery_person_phone
+                   d.phone AS delivery_person_phone,
+                   d.email AS delivery_person_email
             FROM orders o
             JOIN order_items oi ON o.id = oi.order_id
             JOIN products p     ON oi.product_id = p.id
@@ -176,7 +189,7 @@ class OrderModel extends Model
     public function getOrderItems($orderId)
     {
         $stmt = $this->db->prepare('
-            SELECT oi.*, p.name AS product_name, p.price, u.name AS farmer_name
+            SELECT oi.*, p.name AS product_name, p.price, p.farmer_id, u.name AS farmer_name
             FROM order_items oi
             JOIN products p    ON oi.product_id = p.id
             LEFT JOIN users u  ON p.farmer_id = u.id
@@ -230,10 +243,20 @@ class OrderModel extends Model
     public function getByIdForFarmer($orderId, $farmerId)
     {
         $stmt = $this->db->prepare('
-            SELECT DISTINCT o.*
+            SELECT DISTINCT o.*,
+                   u.name AS customer_name,
+                   u.email AS customer_email,
+                   u.phone,
+                   u.address AS customer_address,
+                   d.name AS delivery_person_name,
+                   d.phone AS delivery_person_phone,
+                   d.email AS delivery_person_email,
+                   COALESCE(o.delivery_address, u.address) AS address
             FROM orders o
             JOIN order_items oi ON o.id = oi.order_id
             JOIN products p     ON oi.product_id = p.id
+            JOIN users u        ON o.user_id = u.id
+            LEFT JOIN users d   ON o.delivery_person_id = d.id
             WHERE o.id = ? AND p.farmer_id = ?
         ');
         $stmt->execute([$orderId, $farmerId]);
@@ -250,6 +273,7 @@ class OrderModel extends Model
                    u.address,
                    d.name  AS delivery_person_name,
                    d.phone AS delivery_person_phone,
+                   d.email AS delivery_person_email,
                    COALESCE(o.delivery_address, u.address) AS address
             FROM orders o
             JOIN users u       ON o.user_id = u.id

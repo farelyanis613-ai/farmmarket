@@ -1,4 +1,9 @@
 <?php
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit('Accès interdit');
+}
+
 // Migration pour ajouter phone et address aux users
 
 try {

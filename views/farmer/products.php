@@ -1,9 +1,6 @@
 <?php require __DIR__ . '/../partials/header.php'; ?>
 
 <!-- Idéalement à déplacer dans le <head> de partials/header.php pour de meilleures perfs -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-
 <!-- Inline styles moved to public/css/style.css -->
 <!-- views/farmer/products.php: original <style> block consolidated into public/css/style.css -->
 
@@ -113,9 +110,7 @@
                                         <form method="post" action="index.php?action=farmer/delete-product" class="inline"
                                               onsubmit="return confirm('Supprimer « <?= $productName ?> » ? Cette action est irréversible.');">
                                             <input type="hidden" name="id" value="<?= $productId ?>">
-                                            <?php if (isset($csrf_token)): ?>
-                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                                            <?php endif; ?>
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? getCsrfToken()) ?>">
                                             <button type="submit"
                                                     class="inline-flex items-center gap-1 text-red-600 hover:text-red-700 font-medium"
                                                     aria-label="Supprimer <?= $productName ?>">

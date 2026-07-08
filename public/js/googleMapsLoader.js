@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       };
       script.onerror = function () {
-        reject(new Error('Impossible de charger l’API Google Maps.'));
+        reject(new Error('Impossible de charger l’API Google Maps. Vérifiez votre connexion et que la clé API est valide.'));
       };
       document.head.appendChild(script);
     });

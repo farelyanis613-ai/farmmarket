@@ -23,24 +23,35 @@ function deliveryDashboard()
     $accepted = $orderModel->findByDeliveryAndStatus($deliveryId, 'accepted');
     $completed = $orderModel->findByDeliveryAndStatus($deliveryId, 'delivered');
     $failed = $orderModel->findByDeliveryAndStatus($deliveryId, 'failed');
-    
-    // Include delivered orders also in the 'accepted' list (show them in both sections)
-    $delivered = $orderModel->findByDeliveryAndStatus($deliveryId, 'delivered');
-    // Merge accepted + delivered while preserving order and removing duplicates by id
-    $seen = [];
-    $mergedAccepted = [];
-    foreach (array_merge($accepted, $delivered) as $o) {
-        if (!isset($seen[$o['id']])) {
-            $seen[$o['id']] = true;
-            $mergedAccepted[] = $o;
-        }
-    }
 
     $controller->render('delivery/dashboard.php', [
-        'accepted' => $mergedAccepted,
-        'completed' => $delivered,
+        'accepted' => $accepted,
+        'completed' => $completed,
         'failed' => $failed,
     ]);
+}
+
+function deliveryAssignmentsPoll()
+{
+    checkDeliveryAuth();
+    $deliveryId = $_SESSION['user']['id'];
+    require_once __DIR__ . '/../models/DeliveryModel.php';
+    $deliveryModel = new DeliveryModel();
+    $assignments = $deliveryModel->findByDelivery($deliveryId);
+
+    $reduced = array_map(function ($o) {
+        return [
+            'id' => $o['id'] ?? null,
+            'status' => $o['status'] ?? null,
+            'delivery_person_id' => $o['delivery_person_id'] ?? null,
+            'failed_reason' => $o['failed_reason'] ?? null,
+            'created_at' => $o['created_at'] ?? null,
+        ];
+    }, $assignments);
+
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode(['hash' => md5(json_encode($reduced)), 'count' => count($reduced), 'ts' => time()]);
+    exit;
 }
 
 function deliveryAssignments()
@@ -81,9 +92,10 @@ function updateDeliveryStatus()
         exit;
     }
     
-    $validStatuses = ['accepted', 'delivered'];
-    
-    if (!in_array($status, $validStatuses)) {
+    // Delivery users are only allowed to set the status to 'accepted'
+    $validStatuses = ['accepted'];
+
+    if (!in_array($status, $validStatuses, true)) {
         header('Location: index.php?action=delivery/dashboard');
         exit;
     }
@@ -205,6 +217,12 @@ function respondToDelivery()
     checkDeliveryAuth();
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        header('Location: index.php?action=delivery/dashboard');
+        exit;
+    }
+    // CSRF protection
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $_SESSION['error'] = 'Jeton CSRF invalide.';
         header('Location: index.php?action=delivery/dashboard');
         exit;
     }

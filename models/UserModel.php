@@ -29,6 +29,16 @@ class UserModel extends Model
             $values[] = $data['farm_name'];
         }
 
+        if (isset($data['phone'])) {
+            $fields[] = 'phone';
+            $values[] = $data['phone'];
+        }
+
+        if (isset($data['address'])) {
+            $fields[] = 'address';
+            $values[] = $data['address'];
+        }
+
         $placeholders = array_fill(0, count($fields), '?');
         $fieldsStr = implode(',', $fields);
         $placeholdersStr = implode(',', $placeholders);
@@ -42,7 +52,7 @@ class UserModel extends Model
         $setClauses = [];
         $values = [];
 
-        foreach (['name', 'email', 'farm_name', 'phone', 'address'] as $field) {
+        foreach (['name', 'email', 'farm_name', 'phone', 'address', 'password'] as $field) {
             if (isset($data[$field])) {
                 $setClauses[] = "{$field} = ?";
                 $values[] = $data[$field];
@@ -61,7 +71,7 @@ class UserModel extends Model
 
     public function findByRole($role)
     {
-        $stmt = $this->db->prepare('SELECT * FROM users WHERE role = ?');
+        $stmt = $this->db->prepare('SELECT * FROM users WHERE role = ? ORDER BY id DESC');
         $stmt->execute([$role]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

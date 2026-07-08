@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../models/ProductModel.php';
 require_once __DIR__ . '/../models/UserModel.php';
 require_once __DIR__ . '/../core/Controller.php';
+require_once __DIR__ . '/../NotificationService.php';
 
 function checkFarmerAuth()
 {
@@ -114,6 +115,12 @@ function farmerAssignDeliveryApi()
         exit;
     }
 
+    try {
+        notifierLivreurAssignation($order, $delivery);
+    } catch (Exception $e) {
+        error_log('[farmerAssignDeliveryApi] notifierLivreurAssignation error: ' . $e->getMessage());
+    }
+
     header('Content-Type: application/json; charset=UTF-8');
     echo json_encode([
         'success' => true,
@@ -128,6 +135,30 @@ function farmerAssignDeliveryApi()
     exit;
 }
 
+function farmerOrdersPoll()
+{
+    checkFarmerAuth();
+    $userId = $_SESSION['user']['id'];
+    require_once __DIR__ . '/../models/OrderModel.php';
+    $orderModel = new OrderModel();
+    $orders = $orderModel->findByFarmerId($userId);
+
+    // Reduce payload to fields relevant for change detection
+    $reduced = array_map(function ($o) {
+        return [
+            'id' => $o['id'] ?? null,
+            'status' => $o['status'] ?? null,
+            'delivery_person_id' => $o['delivery_person_id'] ?? null,
+            'failed_reason' => $o['failed_reason'] ?? null,
+            'created_at' => $o['created_at'] ?? null,
+        ];
+    }, $orders);
+
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode(['hash' => md5(json_encode($reduced)), 'count' => count($reduced), 'ts' => time()]);
+    exit;
+}
+
 function farmerUpdateOrderStatusApi()
 {
     checkFarmerAuth();
@@ -139,6 +170,11 @@ function farmerUpdateOrderStatusApi()
     }
 
     if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        if (!empty($_POST['redirect_to'])) {
+            $_SESSION['error'] = 'Jeton CSRF invalide.';
+            header('Location: index.php?action=farmer/orders');
+            exit;
+        }
         http_response_code(403);
         echo json_encode(['success' => false, 'message' => 'Jeton CSRF invalide.']);
         exit;
@@ -150,6 +186,11 @@ function farmerUpdateOrderStatusApi()
     $allowedStatuses = ['pending', 'in_progress', 'accepted', 'delivered', 'failed', 'rejected'];
 
     if (!in_array($status, $allowedStatuses, true)) {
+        if (!empty($_POST['redirect_to'])) {
+            $_SESSION['error'] = 'Statut invalide.';
+            header('Location: index.php?action=farmer/orders');
+            exit;
+        }
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Statut invalide.']);
         exit;
@@ -157,23 +198,33 @@ function farmerUpdateOrderStatusApi()
 
     require_once __DIR__ . '/../models/OrderModel.php';
     $orderModel = new OrderModel();
-    $order = $orderModel->getById($orderId);
+    $order = $orderModel->getByIdForFarmer($orderId, $userId);
 
     if (!$order) {
+        if (!empty($_POST['redirect_to'])) {
+            $_SESSION['error'] = 'Commande introuvable.';
+            header('Location: index.php?action=farmer/orders');
+            exit;
+        }
         http_response_code(404);
         echo json_encode(['success' => false, 'message' => 'Commande introuvable.']);
         exit;
     }
 
-    if ($order['farmer_id'] !== $userId) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Non autorisé.']);
+    if (!$orderModel->updateOrderStatus($orderId, $status)) {
+        if (!empty($_POST['redirect_to'])) {
+            $_SESSION['error'] = 'Impossible de mettre à jour le statut.';
+            header('Location: index.php?action=farmer/orders');
+            exit;
+        }
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Impossible de mettre à jour le statut.']);
         exit;
     }
 
-    if (!$orderModel->updateOrderStatus($orderId, $status)) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Impossible de mettre à jour le statut.']);
+    if (!empty($_POST['redirect_to'])) {
+        $_SESSION['success'] = 'Statut mis à jour avec succès.';
+        header('Location: index.php?action=farmer/orders');
         exit;
     }
 
@@ -195,7 +246,10 @@ function farmerProducts()
     $productModel = new ProductModel();
     $products = $productModel->findByFarmerId($userId);
     
-    $controller->render('farmer/products.php', ['products' => $products]);
+    $controller->render('farmer/products.php', [
+        'products' => $products,
+        'csrf_token' => getCsrfToken(),
+    ]);
 }
 
 function farmerAddDelivery()
@@ -210,6 +264,7 @@ function farmerAddDelivery()
         } else {
             $name = htmlspecialchars(trim($_POST['name'] ?? ''));
             $email = filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL);
+            $phone = htmlspecialchars(trim($_POST['phone'] ?? ''));
             $password = $_POST['password'] ?? '';
             $confirm = $_POST['confirm'] ?? '';
 
@@ -217,6 +272,12 @@ function farmerAddDelivery()
                 $errors[] = 'Tous les champs sont requis. Email doit être valide.';
             } else if ($password !== $confirm) {
                 $errors[] = 'Les mots de passe ne correspondent pas.';
+            }
+
+            if (!empty($phone) && !isValidBeninPhone($phone)) {
+                $errors[] = 'Numéro de téléphone invalide. Utilisez le format +229 01 XX XX XX XX.';
+            } else {
+                $phone = normalizePhone($phone);
             }
 
             if (empty($errors)) {
@@ -231,9 +292,10 @@ function farmerAddDelivery()
                         'email' => $email,
                         'password' => password_hash($password, PASSWORD_DEFAULT),
                         'role' => 'delivery',
+                        'phone' => $phone,
                     ]);
                     $_SESSION['success'] = 'Livreur affecté avec succès';
-                    $controller->redirect('index.php?action=farmer/add-delivery');
+                    $controller->redirect('index.php?action=farmer/deliveries');
                 }
             }
         }
@@ -464,23 +526,33 @@ function farmerAssignDelivery()
     $errors = [];
     
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $deliveryId = intval($_POST['delivery_id'] ?? 0);
-        
-        $delivery = $userModel->find($deliveryId);
-        if (!$delivery || $delivery['role'] !== 'delivery') {
-            $errors[] = 'Livreur invalide.';
-        }
-        
-        if (empty($errors)) {
-            $orderModel->assignDelivery($orderId, $deliveryId);
-            $controller->redirect('index.php?action=farmer/orders');
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+            $errors[] = 'Jeton CSRF invalide.';
+        } else {
+            $deliveryId = intval($_POST['delivery_id'] ?? 0);
+
+            $delivery = $userModel->find($deliveryId);
+            if (!$delivery || $delivery['role'] !== 'delivery') {
+                $errors[] = 'Livreur invalide.';
+            }
+
+            if (empty($errors)) {
+                $orderModel->assignDelivery($orderId, $deliveryId);
+                try {
+                    notifierLivreurAssignation($order, $delivery);
+                } catch (Exception $e) {
+                    error_log('[farmerAssignDelivery] notifierLivreurAssignation error: ' . $e->getMessage());
+                }
+                $controller->redirect('index.php?action=farmer/orders');
+            }
         }
     }
     
     $controller->render('farmer/assign_delivery.php', [
         'order' => $order,
         'deliveries' => $deliveries,
-        'errors' => $errors
+        'errors' => $errors,
+        'csrf_token' => getCsrfToken(),
     ]);
 }
 
@@ -635,16 +707,32 @@ function farmerDeliveriesAdd()
             $email = filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL);
             $phone = htmlspecialchars(trim($_POST['phone'] ?? ''));
             $address = htmlspecialchars(trim($_POST['address'] ?? ''));
+            $password = $_POST['password'] ?? '';
+            $confirm = $_POST['confirm'] ?? '';
 
             if (empty($name) || !$email) {
                 $errors[] = 'Le nom et l\'email valide sont requis.';
             }
 
+            if (!empty($phone) && !isValidBeninPhone($phone)) {
+                $errors[] = 'Numéro de téléphone invalide. Utilisez le format +229 01 XX XX XX XX.';
+            } else {
+                $phone = normalizePhone($phone);
+            }
+
+            // Le mot de passe est optionnel : si laissé vide, un mot de passe
+            // par défaut ("delivery123") est utilisé et le livreur devra le
+            // changer à sa première connexion.
+            if (!empty($password) && $password !== $confirm) {
+                $errors[] = 'Les mots de passe ne correspondent pas.';
+            }
+
             if (empty($errors)) {
                 require_once __DIR__ . '/../models/DeliveryPersonModel.php';
                 $driverModel = new DeliveryPersonModel();
+                $image = trim($_POST['photo_url'] ?? '');
 
-                if ($driverModel->create($name, $email, $phone, $address)) {
+                if ($driverModel->create($name, $email, $phone, $address, $image, $password)) {
                     $_SESSION['success'] = 'Livreur ajouté avec succès';
                     $controller->redirect('index.php?action=farmer/deliveries');
                 } else {
@@ -678,11 +766,16 @@ function farmerDeliveriesEdit()
         } else {
             $name = htmlspecialchars(trim($_POST['name'] ?? ''));
             $email = filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL);
-            $phone = htmlspecialchars(trim($_POST['phone'] ?? ''));
+            $rawPhone = trim($_POST['phone'] ?? '');
+            $phone = normalizePhone($rawPhone);
             $address = htmlspecialchars(trim($_POST['address'] ?? ''));
 
             if (empty($name) || !$email) {
                 $errors[] = 'Le nom et l\'email valide sont requis.';
+            }
+
+            if ($phone !== '' && !isValidBeninPhone($phone)) {
+                $errors[] = 'Numéro de téléphone invalide. Utilisez le format +229 01 XX XX XX XX.';
             }
 
             if (empty($errors)) {

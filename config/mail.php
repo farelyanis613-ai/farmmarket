@@ -1,35 +1,17 @@
 <?php
 
-/**
- * Configuration SMTP pour l'envoi d'emails avec PHPMailer
- * 
- * Utilisez les variables d'environnement ou modifiez directement ci-dessous.
- * Pour Gmail : utilisez une "App Password" générée depuis votre compte Google.
- * 
- * Voir : https://myaccount.google.com/apppasswords
- */
-
-// Charger les variables d'environnement depuis le fichier .env si présent
-if (file_exists(__DIR__ . '/../.env')) {
-    $env = parse_ini_file(__DIR__ . '/../.env');
-    if (is_array($env)) {
-        foreach ($env as $key => $value) {
-            putenv("$key=$value");
-            $_ENV[$key] = $value;
-            $_SERVER[$key] = $value;
-        }
-    }
-}
+require_once __DIR__ . '/bootstrap.php';
+loadEnvFile(__DIR__ . '/../.env');
 
 // Configuration SMTP (Gmail)
-define('MAIL_HOST', getenv('MAIL_HOST') ?: 'smtp.gmail.com');
-define('MAIL_PORT', getenv('MAIL_PORT') ?: 587);
-define('MAIL_USERNAME', getenv('MAIL_USERNAME') ?: 'votre-email@gmail.com');
-define('MAIL_PASSWORD', getenv('MAIL_PASSWORD') ?: 'votre-app-password');
-define('MAIL_ENCRYPTION', getenv('MAIL_ENCRYPTION') ?: 'tls'); // TLS pour port 587
-define('MAIL_DEBUG', intval(getenv('MAIL_DEBUG') ?: 0));
-define('MAIL_FROM_EMAIL', getenv('MAIL_FROM_EMAIL') ?: MAIL_USERNAME);
-define('MAIL_FROM_NAME', getenv('MAIL_FROM_NAME') ?: 'FarmMarket');
+define('MAIL_HOST', env('MAIL_HOST', 'smtp.gmail.com'));
+define('MAIL_PORT', intval(env('MAIL_PORT', 587)));
+define('MAIL_USERNAME', env('MAIL_USERNAME', 'votre-email@gmail.com'));
+define('MAIL_PASSWORD', env('MAIL_PASSWORD', 'votre-app-password'));
+define('MAIL_ENCRYPTION', env('MAIL_ENCRYPTION', 'tls')); // TLS pour port 587
+define('MAIL_DEBUG', intval(env('MAIL_DEBUG', 0)));
+define('MAIL_FROM_EMAIL', env('MAIL_FROM_EMAIL', MAIL_USERNAME));
+define('MAIL_FROM_NAME', env('MAIL_FROM_NAME', 'FarmMarket'));
 
 /**
  * ═══════════════════════════════════════════════════════════

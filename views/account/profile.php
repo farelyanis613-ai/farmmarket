@@ -41,11 +41,11 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Téléphone -->
                     <div>
                         <label class="block text-sm font-medium text-slate-300 mb-2">Numéro de téléphone *</label>
-                        <input type="tel" name="phone" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" required class="w-full rounded-lg border border-slate-700 bg-black px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="+226 65 00 00 00" />
+                        <input type="tel" name="phone" value="<?= htmlspecialchars(formatPhoneDisplay($user['phone'] ?? '')) ?>" required class="w-full rounded-lg border border-slate-700 bg-black px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="+229 01 XX XX XX XX" title="Format attendu : +229 01 XX XX XX XX" />
                     </div>
 
                     <!-- Statut (read-only) -->
@@ -74,6 +74,18 @@
                 <div>
                     <label class="block text-sm font-medium text-slate-300 mb-2">Adresse *</label>
                     <textarea name="address" rows="4" required data-editable class="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Entrez votre adresse complète"><?= htmlspecialchars($user['address'] ?? '') ?></textarea>
+                </div>
+
+                <!-- Changer le mot de passe -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Nouveau mot de passe</label>
+                        <input type="password" name="password" class="w-full rounded-lg border border-slate-700 bg-black px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Laisser vide pour ne pas changer" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Confirmer mot de passe</label>
+                        <input type="password" name="confirm_password" class="w-full rounded-lg border border-slate-700 bg-black px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Confirmez le nouveau mot de passe" />
+                    </div>
                 </div>
 
                 <!-- Bouton Mettre à jour -->

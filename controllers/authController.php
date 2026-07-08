@@ -77,22 +77,22 @@ function login()
                             'name' => $user['name'],
                             'farm_name' => $user['farm_name'] ?? null,
                         ];
-                        
+
                         $_SESSION['success'] = 'Vous êtes connecté ! Bienvenue ' . htmlspecialchars($user['name']) . '.';
-                        
+
                         $redirects = [
                             'farmer' => 'index.php?action=farmer/dashboard',
                             'delivery' => 'index.php?action=delivery/dashboard',
                             'admin' => 'index.php?action=admin',
                             'client' => 'index.php?action=home',
                         ];
-                        
+
                         $redirect = $redirects[$user['role']] ?? 'index.php?action=home';
                         $allowedNext = ['orders', 'products', 'cart', 'checkout', 'checkout/mobile'];
                         if ($user['role'] === 'client' && in_array($next, $allowedNext, true)) {
                             $redirect = 'index.php?action=' . $next;
                         }
-                        
+
                         // On successful login reset login attempts
                         try {
                             if (isset($pdo)) {
@@ -187,7 +187,7 @@ function register()
                         'password' => password_hash($password, PASSWORD_DEFAULT),
                         'role' => $role,
                     ];
-                    
+
                     global $pdo;
                     $userModel->create($userData);
                     $userId = $pdo->lastInsertId();
@@ -203,13 +203,13 @@ function register()
                     ];
 
                     $_SESSION['success'] = 'Vous êtes connecté ! Bienvenue ' . htmlspecialchars($name) . '.';
-                    
+
                     $allowedNext = ['orders', 'products', 'cart', 'checkout'];
                     $redirect = 'index.php?action=orders';
                     if (in_array($next, $allowedNext, true)) {
                         $redirect = 'index.php?action=' . $next;
                     }
-                    
+
                     $controller->redirect($redirect);
                 }
             }

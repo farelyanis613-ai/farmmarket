@@ -74,7 +74,7 @@ function viewCart()
     }, $cartItems));
 
     $deliveryType = $_SESSION['cart_delivery'] ?? 'home';
-    $deliveryFee = ($deliveryType === 'home') ? 1500 : 0;
+    $deliveryFee = getDeliveryFee($deliveryType);
 
     $promoCode = $_SESSION['promo_code'] ?? '';
     $promoValid = $_SESSION['promo_valid'] ?? false;
@@ -122,6 +122,17 @@ function addToCart()
 
     if ($product) {
         $cart = getCart();
+        $currentCartQty = isset($cart[$productId]) ? max(0, intval($cart[$productId]['quantity'] ?? 0)) : 0;
+        $availableStock = max(0, intval($product['stock'] ?? 0));
+        $maxAddable = max(0, $availableStock - $currentCartQty);
+
+        if ($maxAddable <= 0) {
+            $_SESSION['error'] = 'Désolé, ce produit n’est plus disponible.';
+            $controller->redirect('index.php?action=cart');
+            return;
+        }
+
+        $quantity = min($quantity, $maxAddable);
 
         if (isset($cart[$productId])) {
             $cart[$productId]['quantity'] += $quantity;
@@ -231,8 +242,8 @@ function applyPromo()
     if (!empty($_POST['delivery_type'])) {
 
         $_SESSION['cart_delivery'] =
-            ($_POST['delivery_type'] === 'pickup')
-            ? 'pickup'
+            ($_POST['delivery_type'] === 'shop')
+            ? 'shop'
             : 'home';
     }
 

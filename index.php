@@ -8,14 +8,23 @@ $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (!empty
 $appEnv = env('APP_ENV', '');
 $secure = $isHttps || strtolower($appEnv) === 'production';
 
-session_set_cookie_params([
+// NOTE: on ne définit PAS 'domain' à partir de HTTP_HOST : celui-ci contient
+// souvent un port (ex: "localhost:8000") ou une IP brute, ce qui est un
+// Domain de cookie invalide et fait que le navigateur rejette le cookie de
+// session. Un domaine explicite (sans port) peut être fourni via .env si
+// besoin (ex: pour partager la session entre sous-domaines en production).
+$cookieParams = [
     'lifetime' => 0,
     'path' => '/',
-    'domain' => $_SERVER['HTTP_HOST'] ?? '',
     'secure' => $secure,
     'httponly' => true,
-    'samesite' => 'Lax'
-]);
+    'samesite' => 'Lax',
+];
+$cookieDomain = env('APP_COOKIE_DOMAIN', '');
+if ($cookieDomain !== '') {
+    $cookieParams['domain'] = $cookieDomain;
+}
+session_set_cookie_params($cookieParams);
 session_start();
 
 require_once __DIR__ . '/config/database.php';

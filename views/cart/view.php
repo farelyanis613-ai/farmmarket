@@ -90,8 +90,8 @@
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(getCsrfToken()) ?>">
             <div class="flex items-center border border-slate-200 rounded-lg overflow-hidden">
               <button type="submit" name="quantity" value="<?= max(1, $item['quantity'] - 1) ?>"
-                      class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors text-base"
-                      <?= $item['quantity'] <= 1 ? 'disabled class="opacity-40 cursor-not-allowed"' : '' ?>>
+                      class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors text-base <?= $item['quantity'] <= 1 ? 'opacity-40 cursor-not-allowed' : '' ?>"
+                      <?= $item['quantity'] <= 1 ? 'disabled' : '' ?>>
                 −
               </button>
               <span class="w-8 h-8 flex items-center justify-center text-sm font-medium text-slate-900 border-x border-slate-200">
@@ -209,7 +209,7 @@
 
 <script>
 const subtotalBase  = <?= (int)($subtotal ?? 0) ?>;
-let   currentFee    = <?= (int)($deliveryFee ?? 1500) ?>;
+let   currentFee    = <?= (int)($deliveryFee ?? HOME_DELIVERY_FEE) ?>;
 let   promoDiscount = <?= (int)($promoDiscount ?? 0) ?>;
 
 function recalcTotal() {

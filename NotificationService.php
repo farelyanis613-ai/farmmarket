@@ -95,37 +95,79 @@ function getAfricasTalkingClient()
 function sendNotificationSms($toPhone, $message)
 {
     $toPhone = normalizePhoneForSms($toPhone);
+
     if ($toPhone === '') {
-        error_log('[NotificationService] Invalid phone number: ' . var_export($toPhone, true));
-        return false;
+        die("❌ Numéro de téléphone invalide");
     }
 
     $client = getAfricasTalkingClient();
+
     if (!$client) {
-        error_log('[NotificationService] Africa\'s Talking client unavailable');
-        return false;
+        die("❌ Impossible d'initialiser Africa's Talking");
     }
 
     try {
+
         $sms = $client->sms();
+
         $options = [
-            'to' => $toPhone,
+            'to'      => $toPhone,
             'message' => $message,
         ];
+
         if (!empty(AT_FROM)) {
             $options['from'] = AT_FROM;
         }
+
+        echo "<pre>";
+        echo "===== OPTIONS ENVOYÉES =====\n";
+        print_r($options);
+
         $result = $sms->send($options);
 
-        if (!empty($result['status']) && $result['status'] === 'success') {
-            return true;
+        echo "\n===== RÉPONSE D'AFRICA'S TALKING =====\n";
+        print_r($result);
+        echo "</pre>";
+
+        if (empty($result['status'])) {
+            die("❌ Aucune réponse de l'API.");
         }
 
-        error_log('[NotificationService] SMS API error: ' . var_export($result, true));
-        return false;
+        if ($result['status'] != 'success') {
+            die("❌ Erreur HTTP : " . print_r($result, true));
+        }
+
+        $data = $result['data'];
+
+        if (!isset($data->SMSMessageData->Recipients)) {
+            die("❌ Aucun destinataire retourné.");
+        }
+
+        foreach ($data->SMSMessageData->Recipients as $recipient) {
+
+            echo "<hr>";
+            echo "<b>Numéro :</b> " . $recipient->number . "<br>";
+            echo "<b>Status :</b> " . $recipient->status . "<br>";
+            echo "<b>Status Code :</b> " . $recipient->statusCode . "<br>";
+
+            if (isset($recipient->messageId)) {
+                echo "<b>Message ID :</b> " . $recipient->messageId . "<br>";
+            }
+
+            if (isset($recipient->cost)) {
+                echo "<b>Coût :</b> " . $recipient->cost . "<br>";
+            }
+        }
+
+        return true;
+
     } catch (Exception $e) {
-        error_log('[NotificationService] SMS exception: ' . $e->getMessage());
-        return false;
+
+        die(
+            "<pre>EXCEPTION AFRICA'S TALKING\n\n" .
+            $e->getMessage() .
+            "</pre>"
+        );
     }
 }
 
@@ -200,16 +242,22 @@ function notifierLivreurAssignation($commande, $livreur)
 
 function notifierClientFacture($commande, $client)
 {
+    $orderModel = new OrderModel();
     $orderId = intval($commande['id'] ?? 0);
-    $subject = 'Votre facture FarmMarket #' . $orderId;
+    $orderNumber = $orderModel->getUserOrderSequence($orderId) ?? $orderId;
+    $deliveryTypeLabel = (($commande['delivery_type'] ?? 'home') === 'home') ? 'livraison à domicile' : 'retrait en boutique';
+    $deliveryFee = number_format((float)($commande['delivery_fee'] ?? 0), 0, '', ' ');
+    $totalPrice = number_format((float)($commande['total_price'] ?? 0), 0, '', ' ');
+    $subject = 'Votre facture FarmMarket #' . $orderNumber;
     $html = '<p>Bonjour ' . htmlspecialchars($client['name'] ?? 'Client') . ',</p>' .
-            '<p>Votre paiement a été confirmé pour la commande <strong>#' . $orderId . '</strong>.</p>' .
+            '<p>Votre paiement a bien été confirmé pour la commande <strong>#' . $orderNumber . '</strong>.</p>' .
+            '<p><strong>Détails :</strong> ' . htmlspecialchars($deliveryTypeLabel) . ' · Total : ' . htmlspecialchars($totalPrice) . ' FCFA</p>' .
             '<p>La facture a été envoyée à votre adresse email.</p>';
-    $alt = 'Bonjour ' . ($client['name'] ?? 'Client') . ', votre paiement a été confirmé pour la commande #' . $orderId . '. La facture a été envoyée par email.';
+    $alt = 'Bonjour ' . ($client['name'] ?? 'Client') . ', votre paiement a été confirmé pour la commande #' . $orderNumber . '. Détails : ' . $deliveryTypeLabel . ' - Total ' . $totalPrice . ' FCFA. La facture a été envoyée par email.';
 
         // For client notifications we only send an SMS here to avoid duplicate emails:
         if (!empty($client['phone'])) {
-            $sms = 'Paiement confirmé pour la commande #' . $orderId . '. Merci pour votre commande.';
+            $sms = 'Commande #' . $orderNumber . ' confirmée. Paiement reçu. ' . ucfirst($deliveryTypeLabel) . '. Total ' . $totalPrice . ' FCFA. Merci pour votre commande FarmMarket.';
             if (!sendNotificationSms($client['phone'], $sms)) {
                 error_log('[NotificationService] Failed SMS client #' . intval($client['id'] ?? 0) . ' for order #' . $orderId);
             }

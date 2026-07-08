@@ -22,7 +22,7 @@
       <div class="grid grid-cols-2 gap-4 mt-6">
         <div>
           <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Numéro de commande</p>
-          <p class="text-2xl font-mono font-semibold text-emerald-700">#CMD-<?= htmlspecialchars($orderId) ?></p>
+          <p class="text-2xl font-mono font-semibold text-emerald-700">#<?= htmlspecialchars((string)($orderNumber ?? $orderId)) ?></p>
         </div>
         <div>
           <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Statut</p>

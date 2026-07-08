@@ -1,0 +1,14 @@
+{
+  "name": "farmmarket",
+  "private": true,
+  "version": "1.0.0",
+  "description": "FarmMarket web application",
+  "scripts": {
+    "build:css": "npx tailwindcss -i src/tailwind.css -o public/css/tailwind.min.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.5.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0"
+  }
+}

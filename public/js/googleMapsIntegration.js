@@ -28,6 +28,46 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let map;
     let marker;
+    let autocomplete;
+    // Try to wire Places Autocomplete when the API is available
+    window.loadGoogleMapsApi().then(function (maps) {
+      try {
+        if (maps.places && addressInput) {
+          autocomplete = new maps.places.Autocomplete(addressInput, { types: ['geocode'] });
+          // limit returned fields for performance
+          if (typeof autocomplete.setFields === 'function') {
+            autocomplete.setFields(['geometry', 'formatted_address']);
+          }
+          autocomplete.addListener && autocomplete.addListener('place_changed', function () {
+            var place = autocomplete.getPlace();
+            if (place && place.geometry && place.geometry.location) {
+              // update input value with formatted address when available
+              if (place.formatted_address) {
+                addressInput.value = place.formatted_address;
+              }
+              var loc = place.geometry.location;
+              // ensure container is cleared and map/marker are created or updated
+              container.innerHTML = '';
+              if (!map) {
+                map = new maps.Map(container, { center: loc, zoom: 14 });
+              } else {
+                map.setCenter(loc);
+              }
+              if (!marker) {
+                marker = new maps.Marker({ map: map, position: loc, title: 'Adresse de livraison' });
+              } else {
+                marker.setPosition(loc);
+              }
+            }
+          });
+        }
+      } catch (e) {
+        // ignore autocomplete errors, keep geocoding fallback
+        console.warn('Autocomplete non disponible', e);
+      }
+    }).catch(function () {
+      // loader failed — geocode fallback will still be used on input change/blur
+    });
     const updateMap = function (address) {
       if (!address || !address.trim()) {
         container.innerHTML = '<div class="flex h-full items-center justify-center text-sm text-slate-500">Saisissez votre adresse pour afficher la carte.</div>';
@@ -66,7 +106,8 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .catch(function (error) {
           console.error(error);
-          container.innerHTML = '<div class="flex h-full items-center justify-center text-sm text-red-500">Impossible de charger la carte.</div>';
+          const message = error && error.message ? error.message : 'Impossible de charger la carte.';
+          container.innerHTML = '<div class="flex h-full items-center justify-center text-sm text-red-500">' + message + '</div>';
         });
     };
 
@@ -125,7 +166,8 @@ document.addEventListener('DOMContentLoaded', function () {
       })
       .catch(function (error) {
         console.error(error);
-        showError('Impossible de charger la carte.');
+        const message = error && error.message ? error.message : 'Impossible de charger la carte.';
+        showError(message);
       });
   };
 });

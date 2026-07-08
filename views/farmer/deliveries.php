@@ -1,12 +1,12 @@
 <?php require __DIR__ . '/../partials/header.php'; ?>
 
-<div class="container mx-auto p-6 space-y-8">
-    <div class="flex justify-between items-center">
+<div class="page-content">
+    <div class="page-header">
         <div>
-            <h1 class="text-3xl font-bold">Gestion des Livreurs</h1>
-            <p class="text-gray-600 mt-2">Gérez vos livreurs et assignez-les aux commandes</p>
+            <h1 class="page-title">Gestion des livreurs</h1>
+            <p class="page-subtitle">Gérez vos livreurs et assignez-les aux commandes</p>
         </div>
-        <a href="index.php?action=farmer/deliveries/add" class="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 font-semibold">+ Ajouter un livreur</a>
+        <a href="index.php?action=farmer/deliveries/add" class="btn-primary">+ Ajouter un livreur</a>
     </div>
 
     <?php if (isset($_SESSION['success'])): ?>
@@ -48,8 +48,23 @@
                     </thead>
                     <tbody class="divide-y divide-gray-200">
                         <?php foreach ($deliverers as $driver): ?>
+                            <?php
+                                $driverImage = trim($driver['image'] ?? '');
+                                if ($driverImage !== '' && !preg_match('~^(https?:)?//|^/|^data:~i', $driverImage)) {
+                                    $driverImage = 'public/images/' . ltrim($driverImage, '/');
+                                }
+                            ?>
                             <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= htmlspecialchars($driver['name']) ?></td>
+                                <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                                    <div class="inline-flex items-center gap-3">
+                                        <?php if (!empty($driverImage)): ?>
+                                            <img src="<?= htmlspecialchars($driverImage) ?>" alt="Photo de <?= htmlspecialchars($driver['name']) ?>" class="h-10 w-10 rounded-full object-cover border border-gray-200">
+                                        <?php else: ?>
+                                            <span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700 border border-gray-200"><?= htmlspecialchars(mb_strtoupper(mb_substr($driver['name'], 0, 2))) ?></span>
+                                        <?php endif; ?>
+                                        <span><?= htmlspecialchars($driver['name']) ?></span>
+                                    </div>
+                                </td>
                                 <td class="px-6 py-4 text-sm text-gray-600"><?= htmlspecialchars($driver['email']) ?></td>
                                 <td class="px-6 py-4 text-sm text-gray-600"><?= htmlspecialchars($driver['phone'] ?? 'N/A') ?></td>
                                 <td class="px-6 py-4 text-sm text-gray-600"><?= htmlspecialchars($driver['address'] ?? 'N/A') ?></td>
@@ -60,11 +75,15 @@
                                 </td>
                                 <td class="px-6 py-4 text-center space-x-2">
                                     <a href="index.php?action=farmer/deliveries/edit&id=<?= $driver['id'] ?>" class="inline-flex items-center px-3 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-medium">
-                                        Modifier
+                                        Profil
                                     </a>
-                                    <a href="index.php?action=farmer/deliveries/delete&id=<?= $driver['id'] ?>" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce livreur ?')" class="inline-flex items-center px-3 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 text-xs font-medium">
-                                        Supprimer
-                                    </a>
+                                    <form action="index.php?action=farmer/deliveries/delete" method="post" class="inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce livreur ?');">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(getCsrfToken()) ?>">
+                                        <input type="hidden" name="id" value="<?= $driver['id'] ?>">
+                                        <button type="submit" class="inline-flex items-center px-3 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 text-xs font-medium">
+                                            Supprimer
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

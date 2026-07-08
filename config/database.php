@@ -54,6 +54,7 @@ try {
     }
 } catch (PDOException $e) {
     // Log full error server-side, but show a generic message to the client unless APP_DEBUG is enabled
+    error_log('[DB DEBUG] Connexion échouée: ' . $e->getMessage());
     error_log('[Database] ' . $e->getMessage());
     if (defined('APP_DEBUG') && APP_DEBUG) {
         // In debug/dev environments we still want to see the error

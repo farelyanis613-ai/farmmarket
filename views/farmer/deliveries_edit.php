@@ -31,7 +31,7 @@
 
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Téléphone</label>
-                    <input type="tel" name="phone" class="w-full rounded-lg border border-gray-300 px-4 py-3" placeholder="+225 XX XX XX XX" value="<?= htmlspecialchars($deliverer['phone'] ?? '') ?>">
+                    <input type="tel" name="phone" class="w-full rounded-lg border border-gray-300 px-4 py-3" placeholder="+229 01 XX XX XX XX" title="Format attendu : +229 01 XX XX XX XX" value="<?= htmlspecialchars(formatPhoneDisplay($deliverer['phone'] ?? '')) ?>">
                 </div>
 
                 <div>

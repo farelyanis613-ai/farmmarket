@@ -121,7 +121,7 @@ function checkoutComplete()
     $mobileMoneyPhone = normalizePhone(trim($_POST['phone_number'] ?? ''));
     if ($mobileMoneyPhone !== '') {
         if (!isValidBeninPhone($mobileMoneyPhone)) {
-            $_SESSION['error'] = 'Numéro Mobile Money invalide. Utilisez le format +229 xxxxxxxxxx.';
+            $_SESSION['error'] = 'Numéro Mobile Money invalide. Utilisez le format +229 01 XX XX XX XX.';
             $_SESSION['old_phone_number'] = $_POST['phone_number'] ?? '';
             $_SESSION['old_operator'] = trim($_POST['operator'] ?? 'Moov Money');
             $_SESSION['old_delivery_address'] = $deliveryAddress;
@@ -1130,8 +1130,10 @@ function reportFailure()
         exit;
     }
 
-    // Only allow reporting failure if order is not already delivered/failed
-    if (normalizeStatus($order['status']) === 'delivered' || isFailedStatus($order['status'])) {
+    $normalizedStatus = normalizeStatus($order['status'] ?? 'pending');
+
+    // Only allow reporting failure for orders that are still active and not already finalized.
+    if (in_array($normalizedStatus, ['delivered', 'failed', 'rejected', 'cancelled'], true)) {
         $_SESSION['error'] = 'Le statut de cette commande ne peut pas être modifié.';
         $controller->redirect('index.php?action=order/view&id=' . $orderId);
         return;

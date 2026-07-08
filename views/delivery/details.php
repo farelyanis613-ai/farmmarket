@@ -1,7 +1,7 @@
 <?php require __DIR__ . '/../partials/header.php'; ?>
 
 <?php if (!empty($delivery)): ?>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="public/lib/leaflet/leaflet.css">
     <!-- Inline styles moved to public/css/style.css -->
     <!-- views/delivery/details.php: small Leaflet overrides consolidated into public/css/style.css -->
 <?php endif; ?>
@@ -26,6 +26,10 @@
             $normalizedStatus = normalizeStatus($first['status']);
             $currentStatus = formatStatusLabel($first['status']);
             $statusClass = getStatusBadgeClasses($first['status']);
+            $latitudeRaw = trim((string)($first['latitude'] ?? ''));
+            $longitudeRaw = trim((string)($first['longitude'] ?? ''));
+            $addressText = trim((string)($first['address'] ?? $first['delivery_address'] ?? ''));
+            $hasCoordinates = $latitudeRaw !== '' && $longitudeRaw !== '' && is_numeric($latitudeRaw) && is_numeric($longitudeRaw);
         ?>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -83,20 +87,15 @@
                     Pourquoi la livraison a échoué ?
                 </a>
             <?php else : ?>
-                <form action="index.php?action=delivery/update-status" method="post" class="space-y-4">
+                <!-- Delivery users may only accept/reject via the respond endpoint (server enforces allowed statuses) -->
+                <form action="index.php?action=delivery/respond" method="post" class="space-y-4">
                     <input type="hidden" name="order_id" value="<?= htmlspecialchars($_GET['order_id'] ?? '') ?>">
-                    
-                    <div>
-                        <label class="text-sm font-medium text-amber-900">Nouveau statut</label>
-                        <select name="status" required class="mt-2 w-full rounded border border-amber-200 bg-amber-50 px-4 py-2 text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-800">
-                            <option value="accepted" <?= $normalizedStatus === 'accepted' ? 'selected' : '' ?>>Acceptée</option>
-                            <option value="delivered" <?= $normalizedStatus === 'delivered' ? 'selected' : '' ?>>Livrée</option>
-                            <option value="failed" <?= isFailedStatus($first['status']) ? 'selected' : '' ?>>Échouée</option>
-                        </select>
-                        <p class="text-xs text-amber-700 mt-2">Si vous choisissez Échouée, vous serez invité à indiquer la raison.</p>
-                    </div>
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(getCsrfToken()) ?>">
 
-                    <button type="submit" class="bg-amber-900 text-white px-6 py-2 rounded hover:bg-amber-800 transition font-medium">Mettre à jour</button>
+                    <div class="flex gap-3">
+                        <button type="submit" name="action" value="accept" class="flex-1 rounded-lg bg-amber-900 text-white px-6 py-3 font-medium hover:bg-amber-800">Accepter</button>
+                        <button type="submit" name="action" value="reject" class="flex-1 rounded-lg bg-red-600 text-white px-6 py-3 font-medium hover:bg-red-700">Refuser</button>
+                    </div>
                 </form>
             <?php endif; ?>
         </div>
@@ -105,33 +104,74 @@
 </div>
 
 <?php if (!empty($delivery)): ?>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="public/lib/leaflet/leaflet.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            // Récupération sécurisée des coordonnées SQL
-            const lat = parseFloat(<?= json_encode($first['latitude'] ?? 6.37) ?>);
-            const lng = parseFloat(<?= json_encode($first['longitude'] ?? 2.43) ?>);
-            const clientName = <?= json_encode($first['user_name'] ?? 'Client') ?>;
-            const orderId = <?= json_encode($_GET['order_id'] ?? '') ?>;
+        document.addEventListener("DOMContentLoaded", async function() {
+            const mapContainer = document.getElementById('deliveryDetailsMap');
+            if (!mapContainer || typeof L === 'undefined') return;
 
-            // Initialisation de la carte
-            const map = L.map('deliveryDetailsMap').setView([lat, lng], 14);
+            const hasCoordinates = <?= json_encode($hasCoordinates) ?>;
+            const latitude = <?= json_encode($latitudeRaw) ?>;
+            const longitude = <?= json_encode($longitudeRaw) ?>;
+            const addressText = <?= json_encode($addressText) ?>;
+            const clientName = <?= json_encode((string)($first['user_name'] ?? 'Client')) ?>;
+            const orderId = <?= json_encode((string)($_GET['order_id'] ?? '')) ?>;
 
-            // Rendu des tuiles OpenStreetMap
+            const showMessage = (message) => {
+                mapContainer.innerHTML = `<div class="w-full h-full flex items-center justify-center text-center text-sm px-4 text-amber-700">${message}</div>`;
+            };
+
+            const geocodeAddress = async (address) => {
+                try {
+                    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&accept-language=fr`;
+                    const res = await fetch(url, { headers: { 'Accept-Language': 'fr' } });
+                    if (!res.ok) return null;
+                    const results = await res.json();
+                    return results.length ? { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) } : null;
+                } catch (e) {
+                    return null;
+                }
+            };
+
+            let lat = null;
+            let lng = null;
+            let approximate = false;
+
+            if (hasCoordinates) {
+                lat = parseFloat(latitude);
+                lng = parseFloat(longitude);
+            } else if (addressText) {
+                showMessage('Aucune coordonnée GPS enregistrée. Recherche de l’adresse…');
+                const geo = await geocodeAddress(addressText);
+                if (!geo) {
+                    showMessage('Adresse introuvable sur la carte. Vérifiez l’adresse de livraison.');
+                    return;
+                }
+                lat = geo.lat;
+                lng = geo.lng;
+                approximate = true;
+            } else {
+                showMessage('Aucune adresse ni coordonnées GPS n’est disponible pour cette livraison.');
+                return;
+            }
+
+            mapContainer.innerHTML = '';
+            const map = L.map(mapContainer).setView([lat, lng], 14);
+
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
 
-            // Ajout du marqueur de destination
+            const popupText = approximate
+                ? `<div style="font-family: sans-serif; color: #451a03; min-width: 160px;"><strong style="color: #78350f;">Livraison #${orderId}</strong><br><span style="font-size: 13px;">Destinataire : ${clientName}</span><br><span style="color: #b45309;">Position approximative (basée sur l’adresse)</span></div>`
+                : `<div style="font-family: sans-serif; color: #451a03; min-width: 160px;"><strong style="color: #78350f;">Livraison #${orderId}</strong><br><span style="font-size: 13px;">Destinataire : ${clientName}</span></div>`;
+
             L.marker([lat, lng]).addTo(map)
-                .bindPopup(`
-                    <div style="font-family: sans-serif; color: #451a03; min-width: 150px;">
-                        <strong style="color: #78350f;">Livraison #${orderId}</strong><br>
-                        <span style="font-size: 13px;">Destinataire : ${clientName}</span>
-                    </div>
-                `)
+                .bindPopup(popupText)
                 .openPopup();
+
+            setTimeout(() => map.invalidateSize(), 150);
         });
     </script>
 <?php endif; ?>

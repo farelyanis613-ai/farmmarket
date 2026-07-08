@@ -19,15 +19,26 @@ function profile()
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name = htmlspecialchars(trim($_POST['name'] ?? ''));
         $email = htmlspecialchars(trim($_POST['email'] ?? ''));
-        $phone = htmlspecialchars(trim($_POST['phone'] ?? ''));
+        $rawPhone = trim($_POST['phone'] ?? '');
+        $phone = normalizePhone($rawPhone);
         $address = htmlspecialchars(trim($_POST['address'] ?? ''));
+        $password = $_POST['password'] ?? '';
+        $confirmPassword = $_POST['confirm_password'] ?? '';
 
         if (empty($phone) || empty($address)) {
             $errors[] = 'Le téléphone et l\'adresse sont requis.';
         }
 
-        if (!preg_match('/^[\d\s+()-]{7,}$/', $phone)) {
-            $errors[] = 'Numéro de téléphone invalide.';
+        if ($phone !== '' && !isValidBeninPhone($phone)) {
+            $errors[] = 'Numéro de téléphone invalide. Utilisez le format +229 01 XX XX XX XX.';
+        }
+
+        if ($password !== '') {
+            if ($password !== $confirmPassword) {
+                $errors[] = 'Les mots de passe ne correspondent pas.';
+            } elseif (strlen($password) < 6) {
+                $errors[] = 'Le mot de passe doit contenir au moins 6 caractères.';
+            }
         }
 
         if (!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -47,6 +58,9 @@ function profile()
                 'phone' => $phone,
                 'address' => $address,
             ];
+            if ($password !== '') {
+                $updateData['password'] = password_hash($password, PASSWORD_DEFAULT);
+            }
             if (!empty($name) && $name !== $user['name']) {
                 $updateData['name'] = $name;
             }

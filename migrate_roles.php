@@ -1,4 +1,9 @@
 <?php
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit('Accès interdit');
+}
+
 // Migrate roles
 try {
     $pdo = new PDO('mysql:host=127.0.0.1;dbname=farmmarket;charset=utf8', 'root', '');

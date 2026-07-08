@@ -5,9 +5,11 @@
     foreach ($cart as $item) {
         $subtotal += $item['product']['price'] * $item['quantity'];
     }
-    $deliveryFeeHome = 2000;
+    $deliveryFeeHome = HOME_DELIVERY_FEE;
     $total = $subtotal + $deliveryFeeHome;
 ?>
+
+<link rel="stylesheet" href="public/lib/leaflet/leaflet.css">
 
 <div class="page-content pb-16">
 
@@ -74,6 +76,7 @@
 
             <!-- Mode de livraison -->
             <form id="checkoutCompleteForm" action="index.php?action=checkout/complete" method="post">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(getCsrfToken()) ?>">
 
                 <div class="section-card">
                     <h2 class="section-title">🚚 Mode de livraison</h2>
@@ -106,6 +109,22 @@
                     </div>
                 </div>
 
+                <div class="section-card" id="deliveryAddressSection">
+                    <h2 class="section-title">📍 Adresse de livraison</h2>
+                    <p class="fm-field-hint">Indiquez l'adresse où vous souhaitez recevoir votre commande, ou ajustez le repère sur la carte pour préciser l'emplacement exact.</p>
+                    <input id="deliveryAddress" name="delivery_address" type="text" class="fm-input" placeholder="Ex : Cotonou, Akossavié" autocomplete="street-address" value="<?= htmlspecialchars($_SESSION['user']['address'] ?? '') ?>">
+
+                    <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.75rem;margin-top:0.85rem;flex-wrap:wrap;">
+                        <button type="button" id="useMyLocationBtn" class="btn-ghost" style="white-space:nowrap;">📡 Utiliser ma position actuelle</button>
+                    </div>
+
+                    <div id="checkoutAddressMap" class="fm-checkout-map" style="margin-top:0.75rem;height:260px;width:100%;border-radius:16px;border:1px solid #e2e8f0;"></div>
+                    <div id="gpsStatusBar" class="fm-gps-status" style="display:none;margin-top:0.85rem;"></div>
+                    <p id="mapConfirmHint" class="fm-field-hint" style="margin-top:0.6rem;color:#94a3b8;">
+                        📌 Le repère rouge sur la carte est la position qui sera transmise au livreur. Déplacez-le si besoin.
+                    </p>
+                </div>
+
                 <!-- Opérateur Mobile Money -->
                 <div class="section-card">
                     <h2 class="section-title">💳 Opérateur Mobile Money</h2>
@@ -130,8 +149,11 @@
                     <input type="hidden" id="selectedOperator" value="Moov Money">
                 </div>
 
-                <input type="hidden" name="delivery_fee"   id="deliveryFeeInput"  value="<?= $deliveryFeeHome ?>">
-                <input type="hidden" name="total_amount"   id="finalAmountInput"  value="<?= $total ?>">
+                <input type="hidden" name="delivery_fee"      id="deliveryFeeInput"      value="<?= $deliveryFeeHome ?>">
+                <input type="hidden" name="total_amount"      id="finalAmountInput"      value="<?= $total ?>">
+                <input type="hidden" name="delivery_address"  id="deliveryAddressInput"  value="<?= htmlspecialchars($_SESSION['user']['address'] ?? '') ?>">
+                <input type="hidden" name="delivery_latitude" id="deliveryLatitudeInput" value="">
+                <input type="hidden" name="delivery_longitude" id="deliveryLongitudeInput" value="">
 
                 <!-- Bouton continuer -->
                 <button id="continueToMobile" type="button" class="btn-primary w-full">
@@ -200,6 +222,8 @@
 <!-- Inline styles moved to public/css/style.css -->
 <!-- views/cart/checkout.php: original <style> block consolidated into public/css/style.css -->
 
+<script src="public/lib/leaflet/leaflet.js"></script>
+
 <script>
 (function () {
     var subtotal     = <?= intval($subtotal) ?>;
@@ -238,13 +262,6 @@
         document.getElementById('recapTotal').textContent  = fmt(total) + ' FCFA';
     }
 
-    document.querySelectorAll('.fm-delivery-card').forEach(function (card) {
-        card.addEventListener('click', function () { selectDelivery(card); });
-    });
-    // initialiser la première carte sélectionnée
-    var firstCard = document.getElementById('labelHome');
-    if (firstCard) selectDelivery(firstCard);
-
     /* ── Opérateur ──────────────────────────── */
     document.querySelectorAll('.fm-op-pill').forEach(function (pill) {
         pill.addEventListener('click', function () {
@@ -262,17 +279,340 @@
         });
     });
 
+    /* ── Section adresse ────────────────────── */
+    function updateDeliveryAddressSection(isHome) {
+        var section = document.getElementById('deliveryAddressSection');
+        var addressInput = document.getElementById('deliveryAddress');
+        if (!section || !addressInput) {
+            return;
+        }
+        section.style.display = isHome ? 'block' : 'none';
+        if (!isHome) {
+            addressInput.value = '';
+            document.getElementById('deliveryAddressInput').value = '';
+            document.getElementById('deliveryLatitudeInput').value = '';
+            document.getElementById('deliveryLongitudeInput').value = '';
+            window._checkoutLocationConfirmed = false;
+        } else if (window._checkoutMap) {
+            // La section redevient visible : Leaflet a besoin d'un recalcul de taille.
+            setTimeout(function () { window._checkoutMap.invalidateSize(); }, 50);
+        }
+    }
+
+    function bindDeliveryInputs() {
+        var addressInput = document.getElementById('deliveryAddress');
+        if (addressInput) {
+            addressInput.addEventListener('input', function () {
+                document.getElementById('deliveryAddressInput').value = addressInput.value;
+            });
+        }
+    }
+
+    document.querySelectorAll('.fm-delivery-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+            selectDelivery(card);
+            var radio = card.querySelector('input[type="radio"]');
+            if (radio && radio.value === 'home') {
+                updateDeliveryAddressSection(true);
+            } else {
+                updateDeliveryAddressSection(false);
+            }
+        });
+    });
+    // initialiser la première carte sélectionnée
+    var firstCard = document.getElementById('labelHome');
+    if (firstCard) {
+        selectDelivery(firstCard);
+        updateDeliveryAddressSection(true);
+    }
+
+    bindDeliveryInputs();
+
     /* ── Bouton continuer ───────────────────── */
     document.getElementById('continueToMobile').addEventListener('click', function () {
         var deliveryType = (document.querySelector('input[name="delivery_type"]:checked') || {}).value || 'home';
         var fee          = document.getElementById('deliveryFeeInput').value;
         var operator     = document.getElementById('selectedOperator').value;
-        window.location  = 'index.php?action=checkout/mobile'
+        var addressInput = document.getElementById('deliveryAddress');
+        var address      = addressInput ? addressInput.value.trim() : document.getElementById('deliveryAddressInput').value.trim();
+        var latitude     = document.getElementById('deliveryLatitudeInput').value;
+        var longitude    = document.getElementById('deliveryLongitudeInput').value;
+
+        // Pour la livraison à domicile, on exige une position confirmée sur la carte :
+        // on promet un suivi GPS au client, donc on ne peut pas laisser passer une commande sans coordonnées.
+        if (deliveryType === 'home' && (!latitude || !longitude)) {
+            var statusBar = document.getElementById('gpsStatusBar');
+            if (statusBar) {
+                statusBar.style.display = 'block';
+                statusBar.style.color = '#dc2626';
+                statusBar.textContent = 'Veuillez confirmer votre position sur la carte (tapez une adresse, cliquez sur la carte, ou utilisez « Utiliser ma position actuelle ») avant de continuer.';
+            }
+            var mapEl = document.getElementById('checkoutAddressMap');
+            if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+
+        document.getElementById('deliveryAddressInput').value = address;
+
+        var url = 'index.php?action=checkout/mobile'
             + '&delivery_type='  + encodeURIComponent(deliveryType)
             + '&delivery_fee='   + encodeURIComponent(fee)
             + '&operator='       + encodeURIComponent(operator);
+
+        if (deliveryType === 'home') {
+            if (address) {
+                url += '&address=' + encodeURIComponent(address);
+            }
+            if (latitude && longitude) {
+                url += '&latitude=' + encodeURIComponent(latitude) + '&longitude=' + encodeURIComponent(longitude);
+            }
+        }
+
+        window.location = url;
     });
 })();
+</script>
+
+<script>
+/**
+ * Carte de sélection d'adresse pour le checkout (Leaflet / OpenStreetMap).
+ * - Un marqueur déplaçable représente l'adresse de livraison.
+ * - Cliquer sur la carte déplace le marqueur.
+ * - Taper une adresse la géocode automatiquement pour repositionner le marqueur.
+ * - Un bouton permet d'utiliser la géolocalisation du navigateur.
+ * Les coordonnées choisies sont écrites dans #deliveryLatitudeInput / #deliveryLongitudeInput.
+ *
+ * Améliorations apportées :
+ *  - Icône de marqueur personnalisée (divIcon en SVG) : n'appelle plus les fichiers PNG
+ *    par défaut de Leaflet dont le chemin casse fréquemment en self-hosting.
+ *  - Toutes les requêtes de géocodage/reverse-géocodage sont annulables (AbortController)
+ *    pour éviter qu'une réponse tardive n'écrase une saisie plus récente (race condition).
+ *  - Les erreurs réseau sont désormais interceptées (try/catch) et affichées à l'utilisateur.
+ *  - Les recherches sont restreintes au Bénin (countrycodes=bj) pour des résultats plus pertinents.
+ *  - Un flag global window._checkoutLocationConfirmed indique si une position valide a été choisie.
+ */
+window.mountCheckoutAddressMap = function (options) {
+    var containerId     = options.containerId;
+    var addressInputId  = options.addressInputId;
+    var initialAddress  = options.initialAddress || '';
+
+    var mapEl = document.getElementById(containerId);
+    var addressInput = document.getElementById(addressInputId);
+    var latInput  = document.getElementById('deliveryLatitudeInput');
+    var lngInput  = document.getElementById('deliveryLongitudeInput');
+    var statusBar = document.getElementById('gpsStatusBar');
+
+    if (!mapEl || typeof L === 'undefined') {
+        console.error('Impossible d\'afficher la carte : Leaflet n\'est pas chargé.');
+        if (statusBar) {
+            statusBar.style.display = 'block';
+            statusBar.style.color = '#dc2626';
+            statusBar.textContent = 'La carte n\'a pas pu être chargée. Vous pouvez tout de même saisir votre adresse en texte.';
+        }
+        return;
+    }
+
+    window._checkoutLocationConfirmed = false;
+
+    var DEFAULT_LAT = 6.3703, DEFAULT_LNG = 2.3912, DEFAULT_ZOOM = 12; // Cotonou
+    var BENIN_COUNTRY_CODE = 'bj';
+
+    var map = L.map(mapEl, { attributionControl: true }).setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM);
+    window._checkoutMap = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    /* Icône personnalisée en SVG : évite toute dépendance aux images PNG par défaut de Leaflet
+       (marker-icon.png / marker-shadow.png), une source fréquente de marqueurs invisibles. */
+    var pinIcon = L.divIcon({
+        className: 'fm-map-pin',
+        html:
+            '<svg width="34" height="44" viewBox="0 0 34 44" xmlns="http://www.w3.org/2000/svg">' +
+            '<path d="M17 0C7.6 0 0 7.6 0 17c0 11.3 14.2 25.7 15.9 27.4.6.6 1.6.6 2.2 0C19.8 42.7 34 28.3 34 17 34 7.6 26.4 0 17 0z" fill="#16a34a"/>' +
+            '<circle cx="17" cy="17" r="7" fill="#ffffff"/>' +
+            '</svg>',
+        iconSize: [34, 44],
+        iconAnchor: [17, 44],
+        popupAnchor: [0, -40]
+    });
+
+    var marker = L.marker([DEFAULT_LAT, DEFAULT_LNG], { draggable: true, icon: pinIcon }).addTo(map);
+
+    /* ── Annulation des requêtes en vol ─────────────────────────
+       Chaque nouvelle recherche (saisie texte, GPS, adresse initiale) annule la précédente
+       pour qu'une réponse arrivée en retard ne vienne pas écraser une position plus récente. */
+    var activeGeocodeController = null;
+    var activeReverseController = null;
+
+    function setStatus(msg, type) {
+        if (!statusBar) return;
+        statusBar.style.display = msg ? 'block' : 'none';
+        statusBar.textContent = msg || '';
+        statusBar.style.color = type === 'error' ? '#dc2626' : (type === 'success' ? '#15803d' : '#64748b');
+    }
+
+    function updateCoords(lat, lng) {
+        window._checkoutLocationConfirmed = true;
+        if (latInput) latInput.value = lat.toFixed(6);
+        if (lngInput) lngInput.value = lng.toFixed(6);
+    }
+
+    function placeMarker(lat, lng, recenter) {
+        marker.setLatLng([lat, lng]);
+        if (recenter) map.setView([lat, lng], 15);
+        updateCoords(lat, lng);
+    }
+
+    async function geocodeAddress(query) {
+        if (activeGeocodeController) activeGeocodeController.abort();
+        activeGeocodeController = new AbortController();
+
+        var url = 'https://nominatim.openstreetmap.org/search'
+            + '?format=json&q=' + encodeURIComponent(query)
+            + '&limit=1&accept-language=fr'
+            + '&countrycodes=' + BENIN_COUNTRY_CODE;
+
+        try {
+            var res = await fetch(url, {
+                headers: { 'Accept-Language': 'fr' },
+                signal: activeGeocodeController.signal
+            });
+            if (!res.ok) return { ok: false, aborted: false };
+            var results = await res.json();
+            if (!results.length) return { ok: false, aborted: false };
+            return { ok: true, lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+        } catch (e) {
+            if (e.name === 'AbortError') return { ok: false, aborted: true };
+            return { ok: false, aborted: false, networkError: true };
+        }
+    }
+
+    async function reverseGeocode(lat, lng) {
+        if (activeReverseController) activeReverseController.abort();
+        activeReverseController = new AbortController();
+
+        try {
+            var url = 'https://nominatim.openstreetmap.org/reverse'
+                + '?format=json&lat=' + lat + '&lon=' + lng + '&accept-language=fr';
+            var res = await fetch(url, {
+                headers: { 'Accept-Language': 'fr' },
+                signal: activeReverseController.signal
+            });
+            if (!res.ok) return null;
+            var data = await res.json();
+            return data && data.display_name ? data.display_name : null;
+        } catch (e) {
+            return null; // silencieux : le reverse-geocode n'est qu'un confort d'affichage
+        }
+    }
+
+    function applyReverseName(lat, lng) {
+        reverseGeocode(lat, lng).then(function (name) {
+            if (name && addressInput) {
+                addressInput.value = name;
+                var hidden = document.getElementById('deliveryAddressInput');
+                if (hidden) hidden.value = name;
+            }
+        });
+    }
+
+    /* Déplacement du marqueur à la main */
+    marker.on('dragend', function () {
+        var pos = marker.getLatLng();
+        updateCoords(pos.lat, pos.lng);
+        setStatus('Position mise à jour.', 'success');
+        applyReverseName(pos.lat, pos.lng);
+    });
+
+    /* Clic sur la carte pour repositionner le marqueur */
+    map.on('click', function (e) {
+        placeMarker(e.latlng.lat, e.latlng.lng, false);
+        setStatus('Position mise à jour.', 'success');
+        applyReverseName(e.latlng.lat, e.latlng.lng);
+    });
+
+    /* Saisie d'adresse texte → géocodage automatique (avec debounce) */
+    var geocodeTimeout = null;
+    if (addressInput) {
+        addressInput.addEventListener('input', function () {
+            clearTimeout(geocodeTimeout);
+            var value = addressInput.value.trim();
+            if (value.length < 4) return;
+            geocodeTimeout = setTimeout(function () {
+                setStatus('Recherche de l\'adresse…', 'loading');
+                geocodeAddress(value).then(function (result) {
+                    if (result.aborted) return; // une saisie plus récente a pris le relais
+                    if (result.ok) {
+                        placeMarker(result.lat, result.lng, true);
+                        setStatus('Adresse localisée sur la carte.', 'success');
+                    } else if (result.networkError) {
+                        setStatus('Connexion impossible. Vérifiez votre réseau et placez le repère manuellement.', 'error');
+                    } else {
+                        setStatus('Adresse introuvable. Vous pouvez placer le repère manuellement sur la carte.', 'error');
+                    }
+                });
+            }, 600);
+        });
+    }
+
+    /* Bouton géolocalisation */
+    var geoBtn = document.getElementById('useMyLocationBtn');
+    if (geoBtn) {
+        geoBtn.addEventListener('click', function () {
+            if (!navigator.geolocation) {
+                setStatus('La géolocalisation n\'est pas disponible sur cet appareil.', 'error');
+                return;
+            }
+            geoBtn.disabled = true;
+            setStatus('Récupération de votre position…', 'loading');
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                var lat = pos.coords.latitude;
+                var lng = pos.coords.longitude;
+                placeMarker(lat, lng, true);
+                setStatus('Position actuelle utilisée.', 'success');
+                applyReverseName(lat, lng);
+                geoBtn.disabled = false;
+            }, function (err) {
+                var msg = 'Impossible d\'obtenir votre position. Vérifiez les autorisations de localisation.';
+                if (err && err.code === 1) msg = 'Localisation refusée. Autorisez l\'accès à votre position dans les réglages du navigateur, ou placez le repère manuellement.';
+                if (err && err.code === 3) msg = 'La localisation a pris trop de temps. Réessayez ou placez le repère manuellement.';
+                setStatus(msg, 'error');
+                geoBtn.disabled = false;
+            }, { enableHighAccuracy: true, timeout: 10000 });
+        });
+    }
+
+    /* Position initiale : géocoder l'adresse déjà connue du client, sinon vue par défaut */
+    if (initialAddress && initialAddress.trim().length >= 4) {
+        setStatus('Localisation de votre adresse enregistrée…', 'loading');
+        geocodeAddress(initialAddress.trim()).then(function (result) {
+            if (result.aborted) return;
+            if (result.ok) {
+                placeMarker(result.lat, result.lng, true);
+                setStatus('', null);
+            } else if (result.networkError) {
+                setStatus('Connexion impossible pour localiser votre adresse enregistrée : placez le repère manuellement.', 'error');
+            } else {
+                setStatus('Adresse enregistrée introuvable sur la carte : placez le repère manuellement.', 'error');
+            }
+        });
+    }
+
+    setTimeout(function () { map.invalidateSize(); }, 100);
+};
+
+window.addEventListener('load', function () {
+    if (typeof window.mountCheckoutAddressMap === 'function') {
+        window.mountCheckoutAddressMap({
+            containerId: 'checkoutAddressMap',
+            addressInputId: 'deliveryAddress',
+            initialAddress: document.getElementById('deliveryAddress')?.value || ''
+        });
+    }
+});
 </script>
 
 <?php require __DIR__ . '/../partials/footer.php'; ?>
