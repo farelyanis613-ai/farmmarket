@@ -3,7 +3,7 @@
 require_once __DIR__ . '/bootstrap.php';
 loadEnvFile(__DIR__ . '/../.env');
 
-// Configuration SMTP (Gmail)
+// Configuration SMTP (Gmail) — conservée pour référence, plus utilisée pour l'envoi
 define('MAIL_HOST', env('MAIL_HOST', 'smtp.gmail.com'));
 define('MAIL_PORT', intval(env('MAIL_PORT', 587)));
 define('MAIL_USERNAME', env('MAIL_USERNAME', 'votre-email@gmail.com'));
@@ -12,6 +12,9 @@ define('MAIL_ENCRYPTION', env('MAIL_ENCRYPTION', 'tls')); // TLS pour port 587
 define('MAIL_DEBUG', intval(env('MAIL_DEBUG', 0)));
 define('MAIL_FROM_EMAIL', env('MAIL_FROM_EMAIL', MAIL_USERNAME));
 define('MAIL_FROM_NAME', env('MAIL_FROM_NAME', 'FarmMarket'));
+
+// Clé API Brevo (envoi email via HTTPS, contournement du blocage SMTP sur Railway)
+define('BREVO_API_KEY', env('BREVO_API_KEY', ''));
 
 /**
  * ═══════════════════════════════════════════════════════════
@@ -51,4 +54,20 @@ define('MAIL_FROM_NAME', env('MAIL_FROM_NAME', 'FarmMarket'));
  *            putenv("$key=$value");
  *        }
  *    }
+ *
+ * ═══════════════════════════════════════════════════════════
+ * ENVOI RÉEL DES EMAILS : API BREVO (pas SMTP)
+ * ═══════════════════════════════════════════════════════════
+ *
+ * Railway bloque les ports SMTP (25, 465, 587) sur les plans
+ * gratuits (Free/Trial/Hobby). NotificationService.php utilise
+ * donc l'API HTTPS de Brevo (https://api.brevo.com) pour l'envoi
+ * réel, plutôt que PHPMailer en SMTP.
+ *
+ * Pour configurer :
+ * 1. Compte gratuit sur https://www.brevo.com/
+ * 2. Vérifier l'expéditeur (Senders, domaine, IP → Senders)
+ * 3. Générer une clé API (SMTP et API → API Keys)
+ * 4. Ajouter BREVO_API_KEY=... dans .env (local) ou dans les
+ *    Variables du service sur Railway (production)
  */

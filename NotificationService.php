@@ -8,8 +8,6 @@ require_once __DIR__ . '/models/UserModel.php';
 require_once __DIR__ . '/models/OrderModel.php';
 
 use AfricasTalking\SDK\AfricasTalking;
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception as PHPMailerException;
 
 function sendNotificationEmail($toEmail, $subject, $htmlBody, $altBody = '')
 {
@@ -18,51 +16,56 @@ function sendNotificationEmail($toEmail, $subject, $htmlBody, $altBody = '')
         return false;
     }
 
-    try {
-        $mail = new PHPMailer(true);
-        $mail->isSMTP();
-        $mail->SMTPDebug = defined('MAIL_DEBUG') ? MAIL_DEBUG : 0;
-        $mail->Debugoutput = 'error_log';
-        $mail->Host = MAIL_HOST;
-        $mail->SMTPAuth = true;
-        $mail->Username = MAIL_USERNAME;
-        $mail->Password = MAIL_PASSWORD;
-        $mail->Port = MAIL_PORT;
-
-        if (defined('MAIL_ENCRYPTION') && strtolower(MAIL_ENCRYPTION) === 'ssl') {
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        } else {
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        }
-
-        $senderEmail = MAIL_FROM_EMAIL ?: MAIL_USERNAME;
-        $senderName = MAIL_FROM_NAME ?: 'FarmMarket';
-
-        $mail->setFrom($senderEmail, $senderName);
-        $mail->Sender = $senderEmail;
-        $mail->addAddress($toEmail);
-        $mail->addReplyTo($senderEmail, $senderName);
-        $mail->addCustomHeader('X-Mailer', 'FarmMarket Mailer');
-        $mail->Priority = 3;
-        $mail->Timeout = 10;
-        $mail->isHTML(true);
-        $mail->CharSet = 'UTF-8';
-        $mail->Subject = $subject;
-        $mail->Body = $htmlBody;
-        $mail->AltBody = $altBody ?: strip_tags($htmlBody);
-        $mail->SMTPOptions = [
-            'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
-                'allow_self_signed' => false,
-            ],
-        ];
-
-        return $mail->send();
-    } catch (PHPMailerException $e) {
-        error_log('[NotificationService] Email exception: ' . $e->getMessage());
+    if (empty(BREVO_API_KEY)) {
+        error_log('[NotificationService] BREVO_API_KEY manquante, envoi email annulé.');
         return false;
     }
+
+    $senderEmail = MAIL_FROM_EMAIL ?: MAIL_USERNAME;
+    $senderName = MAIL_FROM_NAME ?: 'FarmMarket';
+
+    $payload = [
+        'sender' => [
+            'name' => $senderName,
+            'email' => $senderEmail,
+        ],
+        'to' => [
+            ['email' => $toEmail],
+        ],
+        'subject' => $subject,
+        'htmlContent' => $htmlBody,
+        'textContent' => $altBody ?: strip_tags($htmlBody),
+    ];
+
+    $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_HTTPHEADER => [
+            'accept: application/json',
+            'api-key: ' . BREVO_API_KEY,
+            'content-type: application/json',
+        ],
+        CURLOPT_TIMEOUT => 10,
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlError) {
+        error_log('[NotificationService] Brevo cURL error: ' . $curlError);
+        return false;
+    }
+
+    if ($httpCode < 200 || $httpCode >= 300) {
+        error_log('[NotificationService] Brevo API error (HTTP ' . $httpCode . '): ' . $response);
+        return false;
+    }
+
+    return true;
 }
 
 function getAfricasTalkingClient()
@@ -97,17 +100,18 @@ function sendNotificationSms($toPhone, $message)
     $toPhone = normalizePhoneForSms($toPhone);
 
     if ($toPhone === '') {
-        die("❌ Numéro de téléphone invalide");
+        error_log('[NotificationService] Invalid SMS phone number: ' . var_export($toPhone, true));
+        return false;
     }
 
     $client = getAfricasTalkingClient();
 
     if (!$client) {
-        die("❌ Impossible d'initialiser Africa's Talking");
+        error_log('[NotificationService] Africa\'s Talking client unavailable for SMS delivery.');
+        return false;
     }
 
     try {
-
         $sms = $client->sms();
 
         $options = [
@@ -119,58 +123,26 @@ function sendNotificationSms($toPhone, $message)
             $options['from'] = AT_FROM;
         }
 
-        echo "<pre>";
-        echo "===== OPTIONS ENVOYÉES =====\n";
-        print_r($options);
-
         $result = $sms->send($options);
 
-        echo "\n===== RÉPONSE D'AFRICA'S TALKING =====\n";
-        print_r($result);
-        echo "</pre>";
-
-        if (empty($result['status'])) {
-            die("❌ Aucune réponse de l'API.");
+        if (empty($result['status']) || $result['status'] !== 'success') {
+            error_log('[NotificationService] AfricasTalking SMS failed: ' . print_r($result, true));
+            return false;
         }
 
-        if ($result['status'] != 'success') {
-            die("❌ Erreur HTTP : " . print_r($result, true));
-        }
-
-        $data = $result['data'];
-
-        if (!isset($data->SMSMessageData->Recipients)) {
-            die("❌ Aucun destinataire retourné.");
-        }
-
-        foreach ($data->SMSMessageData->Recipients as $recipient) {
-
-            echo "<hr>";
-            echo "<b>Numéro :</b> " . $recipient->number . "<br>";
-            echo "<b>Status :</b> " . $recipient->status . "<br>";
-            echo "<b>Status Code :</b> " . $recipient->statusCode . "<br>";
-
-            if (isset($recipient->messageId)) {
-                echo "<b>Message ID :</b> " . $recipient->messageId . "<br>";
-            }
-
-            if (isset($recipient->cost)) {
-                echo "<b>Coût :</b> " . $recipient->cost . "<br>";
-            }
+        $data = $result['data'] ?? null;
+        if (!$data || !isset($data->SMSMessageData->Recipients)) {
+            error_log('[NotificationService] AfricasTalking SMS invalid response: ' . print_r($result, true));
+            return false;
         }
 
         return true;
-
     } catch (Exception $e) {
-
-        die(
-            "<pre>EXCEPTION AFRICA'S TALKING\n\n" .
-            $e->getMessage() .
-            "</pre>"
-        );
+        error_log('[NotificationService] AfricasTalking exception: ' . $e->getMessage());
+        return false;
     }
 }
-
+ 
 function notifierEleveurNouvelleCommande($commande)
 {
     $orderModel = new OrderModel();
@@ -205,7 +177,7 @@ function notifierEleveurNouvelleCommande($commande)
         }
 
         if (!empty($farmer['phone'])) {
-            $sms = 'Nouvelle commande #' . $orderId . ' recue. Connectez-vous pour la traiter.';
+            $sms = 'Bonjour ' . ($farmer['name'] ?? 'Éleveur') . ', nouvelle commande #' . $orderId . ' reçue avec au moins un de vos produits. Connectez-vous pour la traiter.';
             if (!sendNotificationSms($farmer['phone'], $sms)) {
                 error_log('[NotificationService] Failed SMS farmer #' . $farmerId . ' for order #' . $orderId);
             }
@@ -231,9 +203,84 @@ function notifierLivreurAssignation($commande, $livreur)
     }
 
     if (!empty($livreur['phone'])) {
-        $sms = 'Commande #' . $orderId . ' assignée. Connectez-vous pour voir les détails.';
+        $sms = 'Bonjour ' . ($livreur['name'] ?? 'Livreur') . ', la commande #' . $orderId . ' vous a été assignée. Connectez-vous pour consulter les détails.';
         if (!sendNotificationSms($livreur['phone'], $sms)) {
             error_log('[NotificationService] Failed SMS deliverer #' . intval($livreur['id'] ?? 0) . ' for order #' . $orderId);
+        }
+    }
+
+    return true;
+}
+
+function notifierEleveurCommandeLivree($commande)
+{
+    $orderModel = new OrderModel();
+    $orderId = intval($commande['id'] ?? 0);
+    $items = $orderModel->getOrderItems($orderId);
+    $farmerIds = [];
+
+    foreach ($items as $item) {
+        if (!empty($item['farmer_id'])) {
+            $farmerIds[intval($item['farmer_id'])] = true;
+        }
+    }
+
+    foreach (array_keys($farmerIds) as $farmerId) {
+        $userModel = new UserModel();
+        $farmer = $userModel->find($farmerId);
+        if (!$farmer) {
+            continue;
+        }
+
+        $subject = 'Commande #' . $orderId . ' livrée';
+        $html = '<p>Bonjour ' . htmlspecialchars($farmer['name'] ?? 'Éleveur') . ',</p>' .
+                '<p>La commande <strong>#' . $orderId . '</strong> a été confirmée livrée par le client.</p>' .
+                '<p>Merci de vérifier la commande dans votre espace.</p>';
+        $alt = 'Bonjour ' . ($farmer['name'] ?? 'Éleveur') . ', la commande #' . $orderId . ' a été confirmée livrée par le client. Merci de vérifier la commande dans votre espace.';
+
+        if (!empty($farmer['email']) && filter_var($farmer['email'], FILTER_VALIDATE_EMAIL)) {
+            if (!sendNotificationEmail($farmer['email'], $subject, $html, $alt)) {
+                error_log('[NotificationService] Failed to email farmer #' . $farmerId . ' for delivered order #' . $orderId);
+            }
+        }
+
+        if (!empty($farmer['phone'])) {
+            $sms = 'Bonjour ' . ($farmer['name'] ?? 'Éleveur') . ', la commande #' . $orderId . ' a été confirmée livrée par le client. Vérifiez le suivi dans votre espace.';
+            if (!sendNotificationSms($farmer['phone'], $sms)) {
+                error_log('[NotificationService] Failed SMS farmer #' . $farmerId . ' for delivered order #' . $orderId);
+            }
+        }
+    }
+
+    return true;
+}
+
+function notifierLivreurCommandeLivree($commande)
+{
+    $orderId = intval($commande['id'] ?? 0);
+    $livreur = [
+        'id'    => $commande['delivery_person_id'] ?? null,
+        'name'  => $commande['delivery_person_name'] ?? 'Livreur',
+        'email' => $commande['delivery_person_email'] ?? '',
+        'phone' => $commande['delivery_person_phone'] ?? '',
+    ];
+
+    if (!empty($livreur['email']) && filter_var($livreur['email'], FILTER_VALIDATE_EMAIL)) {
+        $subject = 'Commande #' . $orderId . ' livrée avec succès';
+        $html = '<p>Bonjour ' . htmlspecialchars($livreur['name'] ?? 'Livreur') . ',</p>' .
+                '<p>La commande <strong>#' . $orderId . '</strong> a été confirmée livrée par le client.</p>' .
+                '<p>Merci pour votre travail.</p>';
+        $alt = 'Bonjour ' . ($livreur['name'] ?? 'Livreur') . ', la commande #' . $orderId . ' a été confirmée livrée par le client. Merci pour votre travail.';
+
+        if (!sendNotificationEmail($livreur['email'], $subject, $html, $alt)) {
+            error_log('[NotificationService] Failed to email deliverer #' . intval($livreur['id'] ?? 0) . ' for delivered order #' . $orderId);
+        }
+    }
+
+    if (!empty($livreur['phone'])) {
+        $sms = 'Bonjour ' . ($livreur['name'] ?? 'Livreur') . ', la commande #' . $orderId . ' a été confirmée livrée par le client. Merci pour votre travail.';
+        if (!sendNotificationSms($livreur['phone'], $sms)) {
+            error_log('[NotificationService] Failed SMS deliverer #' . intval($livreur['id'] ?? 0) . ' for delivered order #' . $orderId);
         }
     }
 
