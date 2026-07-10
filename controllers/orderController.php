@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../models/OrderModel.php';
 require_once __DIR__ . '/../models/CartModel.php';
+require_once __DIR__ . '/../models/UserModel.php';
 require_once __DIR__ . '/../core/Controller.php';
 require_once __DIR__ . '/../NotificationService.php';
 
@@ -175,7 +176,11 @@ function checkoutComplete()
     }
 
     try {
-        notifierClientFacture($order, $_SESSION['user']);
+        $userModel = new UserModel();
+        $clientData = $userModel->find($_SESSION['user']['id']);
+        error_log('[DEBUG SMS] session_user_id=' . var_export($_SESSION['user']['id'] ?? null, true));
+        error_log('[DEBUG SMS] clientData=' . print_r($clientData, true));
+        notifierClientFacture($order, $clientData ?: $_SESSION['user']);
     } catch (Exception $e) {
         error_log('[checkoutComplete] notifierClientFacture error: ' . $e->getMessage());
     }
@@ -233,7 +238,11 @@ function placeOrder()
         }
 
         try {
-            notifierClientFacture($order, $_SESSION['user']);
+            $userModel = new UserModel();
+            $clientData = $userModel->find($_SESSION['user']['id']);
+            error_log('[DEBUG SMS] session_user_id=' . var_export($_SESSION['user']['id'] ?? null, true));
+            error_log('[DEBUG SMS] clientData=' . print_r($clientData, true));
+            notifierClientFacture($order, $clientData ?: $_SESSION['user']);
         } catch (Exception $e) {
             error_log('[placeOrder] notifierClientFacture error: ' . $e->getMessage());
         }
