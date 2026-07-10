@@ -39,7 +39,7 @@ function checkoutMobile()
     }
 
     $deliveryType = trim($_GET['delivery_type'] ?? 'home');
-    $deliveryFee  = intval($_GET['delivery_fee'] ?? getDeliveryFee($deliveryType));
+    $deliveryFee  = getDeliveryFee($deliveryType);
     $deliveryLatitude  = trim($_GET['latitude'] ?? '');
     $deliveryLongitude = trim($_GET['longitude'] ?? '');
 
@@ -82,7 +82,7 @@ function checkoutComplete()
     }
 
     $deliveryType    = trim($_POST['delivery_type']    ?? 'home');
-    $deliveryFee     = intval($_POST['delivery_fee']   ?? 0);
+    $deliveryFee     = getDeliveryFee($deliveryType);
     $deliveryAddress = trim($_POST['delivery_address'] ?? '');
 
     // Coordonnées GPS sélectionnées par le client sur la carte (checkout.php).
@@ -188,6 +188,12 @@ function placeOrder()
     $controller = new Controller();
     $cart = CartModel::getCart();
 
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+        $_SESSION['error'] = 'Requête invalide ou jeton CSRF manquant.';
+        $controller->redirect('index.php?action=cart');
+        return;
+    }
+
     if (empty($cart)) {
         $controller->redirect('index.php?action=cart');
         return;
@@ -198,8 +204,8 @@ function placeOrder()
         return;
     }
 
-    $deliveryType = $_POST['delivery_type'] ?? 'home';
-    $deliveryFee  = intval($_POST['delivery_fee'] ?? 0);
+    $deliveryType = trim($_POST['delivery_type'] ?? 'home');
+    $deliveryFee  = getDeliveryFee($deliveryType);
 
     $orderModel = new OrderModel();
     $orderId    = $orderModel->createOrder(
@@ -362,6 +368,16 @@ function markOrderDelivered()
 
     if ($orderModel->updateOrderStatus($orderId, 'delivered')) {
         $_SESSION['success'] = 'Commande marquée comme livrée.';
+        try {
+            notifierEleveurCommandeLivree($order);
+        } catch (Exception $e) {
+            error_log('[markOrderDelivered] notifierEleveurCommandeLivree error: ' . $e->getMessage());
+        }
+        try {
+            notifierLivreurCommandeLivree($order);
+        } catch (Exception $e) {
+            error_log('[markOrderDelivered] notifierLivreurCommandeLivree error: ' . $e->getMessage());
+        }
     } else {
         $_SESSION['error'] = 'Impossible de mettre à jour le statut de la commande.';
     }
@@ -699,15 +715,19 @@ function downloadInvoice()
     $orderModel = new OrderModel();
     $order      = $orderModel->getById($orderId);
 
-    // Allow download for the order owner, the farmer for that order, the assigned delivery person, or admins
+    // Allow download for the order owner, any farmer with products in the order,
+    // the assigned delivery person, or admins.
     $allowed = false;
     $sessionUserId = intval($_SESSION['user']['id'] ?? 0);
     $sessionRole = $_SESSION['user']['role'] ?? '';
     if ($order && intval($order['user_id']) === $sessionUserId) {
         $allowed = true;
     }
-    if (!$allowed && $sessionRole === 'farmer' && intval($order['farmer_id'] ?? 0) === $sessionUserId) {
-        $allowed = true;
+    if (!$allowed && $sessionRole === 'farmer') {
+        $farmerOrder = $orderModel->getByIdForFarmer($orderId, $sessionUserId);
+        if ($farmerOrder) {
+            $allowed = true;
+        }
     }
     if (!$allowed && $sessionRole === 'delivery' && intval($order['delivery_person_id'] ?? 0) === $sessionUserId) {
         $allowed = true;
@@ -741,11 +761,13 @@ function sendInvoiceEmail($orderId, $recipientEmail)
     }
 
     try {
-        if (!file_exists(__DIR__ . '/../vendor/autoload.php')) {
-            throw new Exception('vendor/autoload.php not found. Run: composer install');
-        }
         require_once __DIR__ . '/../vendor/autoload.php';
         require_once __DIR__ . '/../config/mail.php';
+
+        if (empty(BREVO_API_KEY)) {
+            error_log('[sendInvoiceEmail] BREVO_API_KEY manquante, envoi annulé.');
+            return false;
+        }
 
         $orderModel   = new OrderModel();
         $orderDetails = $orderModel->getOrderWithDetails($orderId);
@@ -756,69 +778,69 @@ function sendInvoiceEmail($orderId, $recipientEmail)
             throw new Exception('Order #' . $orderId . ' not found');
         }
 
-        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
-
-        $mail->isSMTP();
-        $mail->SMTPDebug   = defined('MAIL_DEBUG') ? MAIL_DEBUG : 0;
-        $mail->Debugoutput = 'error_log';
-        $mail->Host        = MAIL_HOST;
-        $mail->SMTPAuth    = true;
-        $mail->Username    = MAIL_USERNAME;
-        $mail->Password    = MAIL_PASSWORD;
-
-        if (defined('MAIL_ENCRYPTION') && strtolower(MAIL_ENCRYPTION) === 'ssl') {
-            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-        } else {
-            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-        }
-        $mail->Port = MAIL_PORT;
-
         $senderEmail = MAIL_FROM_EMAIL ?: MAIL_USERNAME;
         $senderName  = MAIL_FROM_NAME ?: 'FarmMarket';
 
-        $mail->setFrom($senderEmail, $senderName);
-        $mail->Sender = $senderEmail;
-        $mail->addAddress($recipientEmail);
-        $mail->addReplyTo($senderEmail, $senderName);
-        $mail->addCustomHeader('X-Mailer', 'FarmMarket Mailer');
-        $mail->Priority = 3;
-        $mail->Timeout = 10;
+        $htmlBody = generateInvoiceHTML($orderId, $orderDetails, $orderItems, $orderNumber);
+        $textBody = generateInvoiceText($orderId, $orderDetails, $orderItems, $orderNumber);
 
-        $mail->Subject = 'Confirmation de commande FarmMarket #' . $orderId;
-        $mail->isHTML(true);
-        $mail->CharSet = 'UTF-8';
-        $mail->SMTPOptions = [
-            'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
-                'allow_self_signed' => false,
+        $payload = [
+            'sender' => [
+                'name' => $senderName,
+                'email' => $senderEmail,
             ],
+            'to' => [
+                ['email' => $recipientEmail],
+            ],
+            'subject' => 'Confirmation de commande FarmMarket #' . $orderId,
+            'htmlContent' => $htmlBody,
+            'textContent' => $textBody,
         ];
-
-        $mail->Body    = generateInvoiceHTML($orderId, $orderDetails, $orderItems, $orderNumber);
-        $mail->AltBody = generateInvoiceText($orderId, $orderDetails, $orderItems, $orderNumber);
 
         try {
             $pdfBytes = generateInvoicePDFBytes($orderId, $orderDetails, $orderItems, $orderNumber);
             if (!empty($pdfBytes)) {
-                $mail->addStringAttachment(
-                    $pdfBytes,
-                    'facture-commande-' . $orderId . '.pdf',
-                    'base64',
-                    'application/pdf'
-                );
+                $payload['attachment'] = [
+                    [
+                        'content' => base64_encode($pdfBytes),
+                        'name' => 'facture-commande-' . $orderId . '.pdf',
+                    ],
+                ];
             }
         } catch (Exception $e) {
             error_log('[sendInvoiceEmail] Could not attach PDF: ' . $e->getMessage());
         }
 
-        $result = $mail->send();
+        $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => [
+                'accept: application/json',
+                'api-key: ' . BREVO_API_KEY,
+                'content-type: application/json',
+            ],
+            CURLOPT_TIMEOUT => 15,
+        ]);
 
-        if ($result) {
-            error_log('[sendInvoiceEmail] Email sent to ' . $recipientEmail . ' for order #' . $orderId);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            error_log('[sendInvoiceEmail] Brevo cURL error: ' . $curlError);
+            return false;
         }
 
-        return $result;
+        if ($httpCode < 200 || $httpCode >= 300) {
+            error_log('[sendInvoiceEmail] Brevo API error (HTTP ' . $httpCode . '): ' . $response);
+            return false;
+        }
+
+        error_log('[sendInvoiceEmail] Email sent to ' . $recipientEmail . ' for order #' . $orderId);
+        return true;
 
     } catch (Exception $e) {
         error_log('[sendInvoiceEmail] Exception: ' . $e->getMessage() . ' (Order #' . $orderId . ')');
@@ -827,7 +849,7 @@ function sendInvoiceEmail($orderId, $recipientEmail)
 }
 
 /**
- * Envoie un email simple (HTML + alt) en réutilisant la config PHPMailer
+ * Envoie un email simple (HTML + alt) via l'API Brevo
  */
 function sendSimpleEmail($toEmail, $subject, $htmlBody, $altBody = '')
 {
@@ -836,51 +858,59 @@ function sendSimpleEmail($toEmail, $subject, $htmlBody, $altBody = '')
     }
 
     try {
-        if (!file_exists(__DIR__ . '/../vendor/autoload.php')) {
-            throw new Exception('vendor/autoload.php not found. Run: composer install');
-        }
         require_once __DIR__ . '/../vendor/autoload.php';
         require_once __DIR__ . '/../config/mail.php';
 
-        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
-        $mail->isSMTP();
-        $mail->SMTPDebug   = defined('MAIL_DEBUG') ? MAIL_DEBUG : 0;
-        $mail->Debugoutput = 'error_log';
-        $mail->Host        = MAIL_HOST;
-        $mail->SMTPAuth    = true;
-        $mail->Username    = MAIL_USERNAME;
-        $mail->Password    = MAIL_PASSWORD;
-        $mail->Port        = MAIL_PORT;
-        if (defined('MAIL_ENCRYPTION') && strtolower(MAIL_ENCRYPTION) === 'ssl') {
-            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-        } else {
-            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        if (empty(BREVO_API_KEY)) {
+            error_log('[sendSimpleEmail] BREVO_API_KEY manquante, envoi annulé.');
+            return false;
         }
 
         $senderEmail = MAIL_FROM_EMAIL ?: MAIL_USERNAME;
         $senderName  = MAIL_FROM_NAME ?: 'FarmMarket';
 
-        $mail->setFrom($senderEmail, $senderName);
-        $mail->Sender = $senderEmail;
-        $mail->addAddress($toEmail);
-        $mail->addReplyTo($senderEmail, $senderName);
-        $mail->addCustomHeader('X-Mailer', 'FarmMarket Mailer');
-        $mail->Priority = 3;
-        $mail->Timeout = 10;
-        $mail->Subject = $subject;
-        $mail->isHTML(true);
-        $mail->CharSet = 'UTF-8';
-        $mail->Body    = $htmlBody;
-        $mail->AltBody = $altBody ?: strip_tags($htmlBody);
-        $mail->SMTPOptions = [
-            'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
-                'allow_self_signed' => false,
+        $payload = [
+            'sender' => [
+                'name' => $senderName,
+                'email' => $senderEmail,
             ],
+            'to' => [
+                ['email' => $toEmail],
+            ],
+            'subject' => $subject,
+            'htmlContent' => $htmlBody,
+            'textContent' => $altBody ?: strip_tags($htmlBody),
         ];
 
-        return $mail->send();
+        $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => [
+                'accept: application/json',
+                'api-key: ' . BREVO_API_KEY,
+                'content-type: application/json',
+            ],
+            CURLOPT_TIMEOUT => 10,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            error_log('[sendSimpleEmail] Brevo cURL error: ' . $curlError);
+            return false;
+        }
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            error_log('[sendSimpleEmail] Brevo API error (HTTP ' . $httpCode . '): ' . $response);
+            return false;
+        }
+
+        return true;
     } catch (Exception $e) {
         error_log('[sendSimpleEmail] Exception: ' . $e->getMessage());
         return false;
