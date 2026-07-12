@@ -1,7 +1,7 @@
 <?php require __DIR__ . '/../partials/header.php'; ?>
 
 <?php if (!empty($delivery)): ?>
-    <link rel="stylesheet" href="public/lib/leaflet/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <!-- Inline styles moved to public/css/style.css -->
     <!-- views/delivery/details.php: small Leaflet overrides consolidated into public/css/style.css -->
 <?php endif; ?>
@@ -101,7 +101,7 @@
 </div>
 
 <?php if (!empty($delivery)): ?>
-    <script src="public/lib/leaflet/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", async function() {
             const mapContainer = document.getElementById('deliveryDetailsMap');

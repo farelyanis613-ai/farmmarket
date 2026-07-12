@@ -1,5 +1,4 @@
 <?php require __DIR__ . '/../partials/header.php'; ?>
-<link rel="stylesheet" href="/css/stats.css">
 
 <div class="page-wrap">
     <?php

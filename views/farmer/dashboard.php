@@ -39,54 +39,11 @@ function fcfa($amount): string
 }
 ?>
 
-<link rel="stylesheet" href="public/lib/leaflet/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
-<!-- Styles consolidés dans public/css/style.css -->
-<style>
-    /* --- KPI cards : accent latéral + halo + micro-interaction --- */
-    .kpi-card {
-        position: relative;
-        overflow: hidden;
-        border-left: 4px solid var(--kpi-accent, #10b981);
-        transition: transform .18s ease, box-shadow .18s ease;
-    }
-    .kpi-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 12px 24px -12px rgba(15, 23, 42, .18);
-    }
-    .kpi-card::after {
-        content: "";
-        position: absolute;
-        top: -30px;
-        right: -30px;
-        width: 110px;
-        height: 110px;
-        border-radius: 9999px;
-        background: var(--kpi-accent, #10b981);
-        opacity: .07;
-        pointer-events: none;
-    }
-    .kpi-icon {
-        background: linear-gradient(135deg, var(--kpi-accent-from), var(--kpi-accent-to));
-        color: #fff;
-        box-shadow: 0 6px 14px -6px var(--kpi-accent-shadow, rgba(16,185,129,.5));
-    }
-    .kpi-value {
-        letter-spacing: -0.02em;
-    }
-    .kpi-bar-track {
-        background: #eef1f5;
-    }
-    .kpi-bar-fill {
-        background: linear-gradient(90deg, var(--kpi-accent-from), var(--kpi-accent-to));
-    }
-    @media (prefers-reduced-motion: reduce) {
-        .kpi-card { transition: none; }
-        .kpi-card:hover { transform: none; }
-    }
-</style>
 
-<div class="page-content font-body text-slate-800">
+
+<div class="page-content page-farmer-dashboard font-body text-slate-800">
 
     <!-- En-tête -->
     <div class="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
@@ -332,7 +289,7 @@ function fcfa($amount): string
 
     <!-- Scripts -->
     <script src="public/lib/chartjs/chart.umd.min.js"></script>
-    <script src="public/lib/leaflet/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {

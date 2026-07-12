@@ -12,12 +12,15 @@
     ?>
     <meta name="google-maps-api-key" content="<?= htmlspecialchars($googleMapsKey) ?>">
     <title><?= htmlspecialchars($pageTitle) ?></title>
-    <!-- Tailwind is compiled to public/css/tailwind.min.css for production -->
-    <link rel="stylesheet" href="public/css/fonts.css">
-    <link rel="stylesheet" href="public/css/style.css">
+    <!-- Tailwind JIT CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/farelyanis613-ai/farmmarket@main/public/css/style.css">
     <?php if ($loadLeaflet) : ?>
-        <link rel="stylesheet" href="public/lib/leaflet/leaflet.css">
-        <script defer src="public/lib/leaflet/leaflet.js"></script>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+        <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <?php endif; ?>
 
     <?php

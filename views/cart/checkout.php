@@ -9,8 +9,6 @@
     $total = $subtotal + $deliveryFeeHome;
 ?>
 
-<link rel="stylesheet" href="public/lib/leaflet/leaflet.css">
-
 <div class="page-content pb-16">
 
     <!-- ── En-tête ────────────────────────────────────── -->
@@ -222,7 +220,7 @@
 <!-- Inline styles moved to public/css/style.css -->
 <!-- views/cart/checkout.php: original <style> block consolidated into public/css/style.css -->
 
-<script src="public/lib/leaflet/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
 (function () {
