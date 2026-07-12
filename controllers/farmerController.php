@@ -89,16 +89,10 @@ function farmerAssignDeliveryApi()
     $orderModel = new OrderModel();
     $userModel = new UserModel();
 
-    $order = $orderModel->getById($orderId);
+    $order = $orderModel->getByIdForFarmer($orderId, $userId);
     if (!$order) {
         http_response_code(404);
         echo json_encode(['success' => false, 'message' => 'Commande introuvable.']);
-        exit;
-    }
-
-    if ($order['farmer_id'] !== $userId) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Non autorisé.']);
         exit;
     }
 

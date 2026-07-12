@@ -1,4 +1,3 @@
-<?php require __DIR__ . '/../partials/header.php'; ?>
 <?php
     $photoFolder = __DIR__ . '/../../public/images/livreurt';
     $photoFiles = [];
@@ -317,11 +316,9 @@
   border-radius: 10px;
   padding: 14px;
 }
-</style>
+<?php require __DIR__ . '/../partials/header.php'; ?>
 
-<div class="page-wrap">
-
-  <a href="index.php?action=farmer/deliveries" class="breadcrumb">
+<div class="page-wrap page-add-delivery">
     <span class="arrow">←</span> Retour aux livreurs
   </a>
 

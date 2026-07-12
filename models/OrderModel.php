@@ -301,20 +301,11 @@ class OrderModel extends Model
     public function updateFailedReason($orderId, $reason)
     {
         try {
-            $this->ensureFailedReasonColumn();
             $stmt = $this->db->prepare('UPDATE orders SET failed_reason = ? WHERE id = ?');
             return $stmt->execute([$reason, $orderId]);
         } catch (PDOException $e) {
             $this->lastError = $e->getMessage();
             return false;
-        }
-    }
-
-    private function ensureFailedReasonColumn()
-    {
-        $columns = $this->db->query('SHOW COLUMNS FROM orders')->fetchAll(PDO::FETCH_COLUMN);
-        if (!in_array('failed_reason', $columns)) {
-            $this->db->exec('ALTER TABLE orders ADD COLUMN failed_reason TEXT NULL AFTER status');
         }
     }
 

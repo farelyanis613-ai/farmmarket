@@ -87,15 +87,12 @@
                     Pourquoi la livraison a échoué ?
                 </a>
             <?php else : ?>
-                <!-- Delivery users may only accept/reject via the respond endpoint (server enforces allowed statuses) -->
+                <!-- Delivery users may only accept via the respond endpoint -->
                 <form action="index.php?action=delivery/respond" method="post" class="space-y-4">
                     <input type="hidden" name="order_id" value="<?= htmlspecialchars($_GET['order_id'] ?? '') ?>">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(getCsrfToken()) ?>">
 
-                    <div class="flex gap-3">
-                        <button type="submit" name="action" value="accept" class="flex-1 rounded-lg bg-amber-900 text-white px-6 py-3 font-medium hover:bg-amber-800">Accepter</button>
-                        <button type="submit" name="action" value="reject" class="flex-1 rounded-lg bg-red-600 text-white px-6 py-3 font-medium hover:bg-red-700">Refuser</button>
-                    </div>
+                    <button type="submit" name="action" value="accept" class="w-full rounded-lg bg-amber-900 text-white px-6 py-3 font-medium hover:bg-amber-800">Accepter</button>
                 </form>
             <?php endif; ?>
         </div>

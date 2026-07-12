@@ -1,89 +1,4 @@
 ﻿<?php require __DIR__ . '/../partials/header.php'; ?>
-
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --bg-root:       #F5F7FA;
-  --bg-card:       #FFFFFF;
-  --bg-card-hover: #FAFBFF;
-  --border:        #E4E9F2;
-  --border-hover:  #C7D4F0;
-  --green:         #22A45D;
-  --green-light:   #EAF7F0;
-  --green-mid:     rgba(34,164,93,0.15);
-  --indigo:        #4F46E5;
-  --indigo-light:  #EEF2FF;
-  --gold:          #D97706;
-  --gold-light:    #FEF3C7;
-  --red:           #DC2626;
-  --red-light:     #FEE2E2;
-  --slate:         #64748B;
-  --slate-light:   #F1F5F9;
-  --text-primary:  #0F172A;
-  --text-secondary:#475569;
-  --text-muted:    #94A3B8;
-  --radius:        18px;
-  --radius-sm:     10px;
-  --shadow-card:   0 1px 3px rgba(15,23,42,0.06), 0 4px 16px rgba(15,23,42,0.05);
-  --shadow-hover:  0 4px 6px rgba(15,23,42,0.04), 0 16px 40px rgba(15,23,42,0.10);
-  --font-display:  'Sora', sans-serif;
-  --font-body:     'Inter', sans-serif;
-}
-
-body {
-  min-height: 100vh;
-  background: radial-gradient(circle at top left, rgba(79,70,229,0.08), transparent 28%),
-              #F5F7FA;
-}
-
-.fm-page {
-  font-family: var(--font-body);
-  color: var(--text-primary);
-  min-height: 100vh;
-  padding: 48px 20px 80px;
-}
-
-/* ── HEADER ── */
-.fm-page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  max-width: 1100px;
-  margin: 0 auto 42px;
-  flex-wrap: wrap;
-}
-.fm-page-header > div {
-  min-width: 0;
-}
-.fm-header-eyebrow {
-  font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--green);
-  margin-bottom: 8px;
-}
-.fm-page-title {
-  font-family: var(--font-display);
-  font-size: clamp(28px, 4vw, 40px);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: var(--text-primary);
-  line-height: 1.05;
-}
-.fm-page-sub {
-  font-size: 15px;
-  color: var(--text-secondary);
-  margin-top: 8px;
-  max-width: 560px;
-}
-.fm-page-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   flex-wrap: wrap;
 }
 .fm-btn-primary {
@@ -607,18 +522,9 @@ body {
 
 </div>
 
-<?php require __DIR__ . '/../partials/footer.php'; ?>
+<?php require __DIR__ . '/../partials/header.php'; ?>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('.fm-btn-report').forEach(function (btn) {
-    btn.addEventListener('click', async function () {
-      const orderId = this.dataset.orderId;
-      const csrf    = this.dataset.csrf;
-
-      const reason = prompt('Expliquez brièvement la raison de l\'échec (facultatif) :');
-      if (reason === null) return; // annulé par l'utilisateur
-
+<div class="fm-page page-orders">
       const confirmed = confirm('Confirmer le signalement d\'échec pour cette commande ?');
       if (!confirmed) return;
 

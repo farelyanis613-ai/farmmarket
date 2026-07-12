@@ -39,10 +39,10 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                 <input type="text" id="searchInput" placeholder="Rechercher par client ou #commande…">
             </div>
-            <button class="filter-btn active" data-filter="all">Toutes <span class="count-badge" id="cnt-all"><?= count($assignments) ?></span></button>
-            <button class="filter-btn" data-filter="pending">En attente</button>
-            <button class="filter-btn" data-filter="delivered">Livrées</button>
-            <button class="filter-btn" data-filter="failed">Échouées</button>
+            <button type="button" class="filter-btn active" data-filter="all">Toutes <span class="count-badge" id="cnt-all"><?= count($assignments) ?></span></button>
+            <button type="button" class="filter-btn" data-filter="pending">En attente</button>
+            <button type="button" class="filter-btn" data-filter="delivered">Livrées</button>
+            <button type="button" class="filter-btn" data-filter="failed">Échouées</button>
         </div>
 
         <!-- Tableau -->
@@ -62,12 +62,12 @@
                         $initials  = strtoupper(substr($a['user_name'] ?? 'C', 0, 1));
                         $badgeClass = getStatusBadgeClasses($a['status']);
                         $label      = formatStatusLabel($a['status']);
-                        // Map status to filter key
-                        $filterKey = match(true) {
-                            str_contains(strtolower($a['status']), 'livr')   => 'delivered',
-                            str_contains(strtolower($a['status']), 'échou')  => 'failed',
-                            str_contains(strtolower($a['status']), 'echec')  => 'failed',
-                            default                                           => 'pending',
+                        // Map status to filter key using normalized value
+                        $normalizedStatus = normalizeStatus($a['status']);
+                        $filterKey = match ($normalizedStatus) {
+                            'delivered' => 'delivered',
+                            'failed'    => 'failed',
+                            default     => 'pending',
                         };
                     ?>
                     <tr data-filter="<?= $filterKey ?>"

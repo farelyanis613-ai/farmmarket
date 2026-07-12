@@ -12,8 +12,7 @@
     ?>
     <meta name="google-maps-api-key" content="<?= htmlspecialchars($googleMapsKey) ?>">
     <title><?= htmlspecialchars($pageTitle) ?></title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="public/css/tailwind.min.css">
+    <!-- Tailwind is compiled to public/css/tailwind.min.css for production -->
     <link rel="stylesheet" href="public/css/fonts.css">
     <link rel="stylesheet" href="public/css/style.css">
     <?php if ($loadLeaflet) : ?>
@@ -95,11 +94,11 @@ if (!isset($_SESSION['user'])) {
             <?php endforeach; ?>
 
             <?php if (isset($_SESSION['user'])) : ?>
-                <div class="border-l border-slate-300 pl-2 md:pl-3 flex gap-2 md:gap-3 items-center flex-wrap">
+                <div class="border-l border-slate-300 pl-2 md:pl-3 flex gap-2 md:gap-3 items-center flex-nowrap">
                     <span class="px-2 py-1 rounded <?= $badgeClass ?> text-xs font-medium whitespace-nowrap">
                         <?= htmlspecialchars(substr($_SESSION['user']['name'], 0, 15)) ?>
                     </span>
-                    <a href="index.php?action=profile" class="nav-pill hidden sm:inline<?= isActiveNav('profile', $currentAction) ? ' nav-pill-active' : '' ?>">Profil</a>
+                    <a href="index.php?action=profile" class="nav-pill<?= isActiveNav('profile', $currentAction) ? ' nav-pill-active' : '' ?>">Profil</a>
                     <?php if (in_array($userRole, ['farmer', 'delivery'], true)) : ?>
                         <button id="themeToggleBtn" type="button" class="nav-pill theme-toggle">Basculer de thème</button>
                     <?php endif; ?>

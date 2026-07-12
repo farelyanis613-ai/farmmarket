@@ -10,7 +10,6 @@ response.html
 # Ignore dependency artifacts and cache
 vendor/
 vendor/*
-composer.lock
 lint_results.txt
 
 

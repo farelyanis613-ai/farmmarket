@@ -178,8 +178,8 @@ function checkoutComplete()
     try {
         $userModel = new UserModel();
         $clientData = $userModel->find($_SESSION['user']['id']);
-        error_log('[DEBUG SMS] session_user_id=' . var_export($_SESSION['user']['id'] ?? null, true));
-        error_log('[DEBUG SMS] clientData=' . print_r($clientData, true));
+        // error_log('[DEBUG SMS] session_user_id=' . var_export($_SESSION['user']['id'] ?? null, true));
+        // error_log('[DEBUG SMS] clientData=' . print_r($clientData, true));
         notifierClientFacture($order, $clientData ?: $_SESSION['user']);
     } catch (Exception $e) {
         error_log('[checkoutComplete] notifierClientFacture error: ' . $e->getMessage());
@@ -240,8 +240,8 @@ function placeOrder()
         try {
             $userModel = new UserModel();
             $clientData = $userModel->find($_SESSION['user']['id']);
-            error_log('[DEBUG SMS] session_user_id=' . var_export($_SESSION['user']['id'] ?? null, true));
-            error_log('[DEBUG SMS] clientData=' . print_r($clientData, true));
+            // error_log('[DEBUG SMS] session_user_id=' . var_export($_SESSION['user']['id'] ?? null, true));
+            // error_log('[DEBUG SMS] clientData=' . print_r($clientData, true));
             notifierClientFacture($order, $clientData ?: $_SESSION['user']);
         } catch (Exception $e) {
             error_log('[placeOrder] notifierClientFacture error: ' . $e->getMessage());

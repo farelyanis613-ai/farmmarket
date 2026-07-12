@@ -21,7 +21,6 @@ function normalizeStatus($status)
         'acceptee' => 'accepted',
         'livre' => 'delivered',
         'livree' => 'delivered',
-        'livre' => 'delivered',
         'delivered' => 'delivered',
         'echouee' => 'failed',
         'failed' => 'failed',

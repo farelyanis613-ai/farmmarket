@@ -3,8 +3,8 @@ DirectoryIndex index.php
 RewriteBase /
 
 # Bloquer l'accès direct à des fichiers sensibles ou outils non destinés au web
-# Bloque récursivement tout sous-répertoire de tools/ et config/ et corrige les chemins vers tools/check_*
-RewriteRule ^(tools/.*|download_assets\.py|tools/download_tailwind_css\.py|config/.*|tools/check_categories\.php|tools/check_orders_columns\.php|import_db\.php|migrate_[^/]+\.php|NotificationService\.php|config\.php|package\.json|response\.html|\.env(?:\.example)?|cookies\.txt|database\.sql|composer\.(?:json|lock))$ - [F,L]
+# Bloque récursivement tout sous-répertoire de tools/ et config/ et protège les scripts/artefacts temporaires
+RewriteRule ^(tools/.*|download_assets\.py|tools/download_tailwind_css\.py|config/.*|tools/check_categories\.php|tools/check_orders_columns\.php|import_db\.php|migrate_[^/]+\.php|migrations/.*|NotificationService\.php|config\.php|package\.json|response\.html|header_checkout\.html|test_sms\.php|tmp_query\.php|lint_results\.txt|\.env(?:\.example)?|cookies\.txt|database\.sql|composer\.(?:json|lock))$ - [F,L]
 
 RewriteRule ^$ index.php [L,QSA]
 RewriteCond %{REQUEST_FILENAME} !-f

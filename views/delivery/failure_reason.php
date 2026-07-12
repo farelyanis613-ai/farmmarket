@@ -23,7 +23,7 @@
             </div>
 
             <button type="submit" class="inline-flex items-center justify-center rounded-full bg-amber-900 px-6 py-3 text-sm font-semibold text-white hover:bg-amber-800 transition">
-                Enregistrer et revenir au dashboard
+                Revenir au dashboard
             </button>
         </form>
     </div>

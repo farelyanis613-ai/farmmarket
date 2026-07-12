@@ -73,8 +73,8 @@
                 'title'   => 'Commandes acceptées',
                 'sub'     => 'En attente de livraison.',
                 'orders'  => $accepted,
-                'pill'    => 'pill-pending',
-                'label'   => 'En attente',
+                'pill'    => 'pill-transit',
+                'label'   => 'Acceptée',
                 'empty'   => 'Aucune commande acceptée pour le moment.',
             ],
             [

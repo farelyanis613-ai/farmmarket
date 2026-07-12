@@ -4,18 +4,6 @@ require_once __DIR__ . '/../core/Model.php';
 
 class ProductModel extends Model
 {
-    private function ensureUpdatedAtColumn()
-    {
-        try {
-            $columns = $this->db->query('SHOW COLUMNS FROM products')->fetchAll(PDO::FETCH_COLUMN);
-            if (!in_array('updated_at', $columns, true)) {
-                $this->db->exec('ALTER TABLE products ADD COLUMN updated_at DATETIME NULL AFTER created_at');
-            }
-        } catch (PDOException $e) {
-            error_log('[ProductModel] unable to ensure updated_at column: ' . $e->getMessage());
-        }
-    }
-
     private function hasColumn($columnName)
     {
         try {
@@ -36,7 +24,6 @@ class ProductModel extends Model
 
     public function getAll()
     {
-        $this->ensureUpdatedAtColumn();
         $stmt = $this->db->query('SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id ' . $this->getProductsOrderClause());
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -56,7 +43,6 @@ class ProductModel extends Model
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        $this->ensureUpdatedAtColumn();
         $category = $this->normalizeCategoryName($category);
         $stmt = $this->db->prepare(
             'SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE LOWER(REPLACE(c.name, "œ", "oe")) = ? ' . $this->getProductsOrderClause()
@@ -84,7 +70,6 @@ class ProductModel extends Model
 
     public function findByFarmerId($farmerId)
     {
-        $this->ensureUpdatedAtColumn();
         $stmt = $this->db->prepare('SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.farmer_id = ? ' . $this->getProductsOrderClause());
         $stmt->execute([$farmerId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -92,8 +77,13 @@ class ProductModel extends Model
 
     public function create($data)
     {
-        $this->ensureUpdatedAtColumn();
-        $stmt = $this->db->prepare('INSERT INTO products (name, description, price, stock, category_id, image, farmer_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
+        $hasUpdatedAt = $this->hasColumn('updated_at');
+        if ($hasUpdatedAt) {
+            $stmt = $this->db->prepare('INSERT INTO products (name, description, price, stock, category_id, image, farmer_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
+        } else {
+            $stmt = $this->db->prepare('INSERT INTO products (name, description, price, stock, category_id, image, farmer_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())');
+        }
+
         $category = null;
         if (isset($data['category_id']) && (string)$data['category_id'] !== '') {
             $catInt = intval($data['category_id']);
@@ -112,7 +102,7 @@ class ProductModel extends Model
             }
         }
 
-        return $stmt->execute([
+        $params = [
             $data['name'],
             $data['description'] ?? '',
             $data['price'],
@@ -120,12 +110,13 @@ class ProductModel extends Model
             $category,
             $data['image'] ?? '',
             $data['farmer_id'] ?? null,
-        ]);
+        ];
+
+        return $stmt->execute($params);
     }
 
     public function update($id, $data)
     {
-        $this->ensureUpdatedAtColumn();
         $setClauses = [];
         $values = [];
 
@@ -151,7 +142,10 @@ class ProductModel extends Model
             return false;
         }
 
-        $setClauses[] = 'updated_at = NOW()';
+        if ($this->hasColumn('updated_at')) {
+            $setClauses[] = 'updated_at = NOW()';
+        }
+
         $values[] = $id;
         $setStr = implode(', ', $setClauses);
         $stmt = $this->db->prepare("UPDATE products SET {$setStr} WHERE id = ?");

@@ -5,29 +5,26 @@ require_once __DIR__ . '/../core/Model.php';
 class DeliveryPersonModel extends Model
 {
     /**
-     * S'assure que la colonne `image` existe sur la table `users`.
-     * Cette colonne n'existe PAS dans le schéma d'origine (database.sql),
-     * ce qui fait échouer create()/update() avec une erreur SQL
-     * "Unknown column 'image'" — avalée silencieusement par le catch,
-     * d'où le bouton qui "ne fait rien". On la crée ici à la volée,
-     * une seule fois par requête.
+     * Vérifie si la colonne `image` existe sur la table `users`.
+     * Cette colonne n'existe pas dans le schéma d'origine (database.sql),
+     * de sorte que create()/update() doit s'adapter si elle est absente.
      */
-    private function ensureImageColumn()
+    private function hasImageColumn()
     {
-        static $checked = false;
-        if ($checked) {
-            return;
+        static $hasImage = null;
+        if ($hasImage !== null) {
+            return $hasImage;
         }
-        $checked = true;
 
         try {
             $stmt = $this->db->query("SHOW COLUMNS FROM users LIKE 'image'");
-            if ($stmt && $stmt->rowCount() === 0) {
-                $this->db->exec('ALTER TABLE users ADD COLUMN image VARCHAR(255) NULL AFTER address');
-            }
+            $hasImage = $stmt && $stmt->rowCount() > 0;
         } catch (Exception $e) {
-            error_log('[DeliveryPersonModel] ensureImageColumn error: ' . $e->getMessage());
+            error_log('[DeliveryPersonModel] hasImageColumn error: ' . $e->getMessage());
+            $hasImage = false;
         }
+
+        return $hasImage;
     }
 
     public function getAll()
@@ -46,8 +43,6 @@ class DeliveryPersonModel extends Model
 
     public function create($name, $email, $phone, $address = '', $image = '', $password = null)
     {
-        $this->ensureImageColumn();
-
         try {
             // Check if email already exists
             $stmt = $this->db->prepare('SELECT id FROM users WHERE email = ?');
@@ -60,11 +55,20 @@ class DeliveryPersonModel extends Model
                 ($password !== null && $password !== '') ? $password : 'delivery123',
                 PASSWORD_DEFAULT
             );
+
+            if ($this->hasImageColumn()) {
+                $stmt = $this->db->prepare('
+                    INSERT INTO users (name, email, password, role, phone, address, image, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                ');
+                return $stmt->execute([$name, $email, $passwordHash, 'delivery', $phone, $address, $image]);
+            }
+
             $stmt = $this->db->prepare('
-                INSERT INTO users (name, email, password, role, phone, address, image, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                INSERT INTO users (name, email, password, role, phone, address, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
             ');
-            return $stmt->execute([$name, $email, $passwordHash, 'delivery', $phone, $address, $image]);
+            return $stmt->execute([$name, $email, $passwordHash, 'delivery', $phone, $address]);
         } catch (Exception $e) {
             error_log('[DeliveryPersonModel] create error: ' . $e->getMessage());
             return false;
@@ -73,8 +77,6 @@ class DeliveryPersonModel extends Model
 
     public function update($id, $name, $email, $phone, $address = '', $image = null)
     {
-        $this->ensureImageColumn();
-
         try {
             // Check if email is already used by another user
             $stmt = $this->db->prepare('SELECT id FROM users WHERE email = ? AND id != ?');
@@ -85,7 +87,7 @@ class DeliveryPersonModel extends Model
 
             $set = 'name = ?, email = ?, phone = ?, address = ?';
             $values = [$name, $email, $phone, $address];
-            if ($image !== null) {
+            if ($image !== null && $this->hasImageColumn()) {
                 $set .= ', image = ?';
                 $values[] = $image;
             }
