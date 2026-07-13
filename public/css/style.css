@@ -25,6 +25,11 @@
       successives) ont été supprimées, en gardant une seule occurrence.
    5. AUCUNE règle ".fm-*" / ".fo-*" propre à un composant n'a été supprimée
       ou modifiée dans son contenu visuel — uniquement dédoublonnées.
+   6. AJOUT (correction rendu catalogue) : 4 classes utilisées par
+      products/list.php n'avaient aucune règle CSS associée et cassaient
+      le rendu (badge de comptage + boutons de filtre affichés sans style) :
+      .fm-catalogue-count, .fm-filter-left, .fm-btn-outline,
+      .fm-btn-primary-sm. Ajoutées en section 7.
    ========================================================================== */
 
 /* --------------------------------------------------------------------
@@ -754,7 +759,44 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .page-products-list .fm-catalogue-title-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .page-products-list .fm-catalogue-title { font-size:2rem; font-weight:800; color:#0f172a; margin:0 0 4px 0; line-height:1.2; }
 .page-products-list .fm-catalogue-sub { font-size:0.9rem; color:#64748b; margin:0; }
-.page-products-list .fm-products-grid { display:grid; gap:20px; grid-template-columns: 1fr; }
+
+/* AJOUT — badge "N produits" (manquant, causait un affichage non stylé) */
+.fm-catalogue-count {
+    display: inline-flex;
+    align-items: center;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.35rem 0.9rem;
+    border-radius: 9999px;
+    white-space: nowrap;
+}
+
+.page-products-list .fm-products-grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(1, 1fr);
+}
+
+@media (min-width: 768px) {
+    .page-products-list .fm-products-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .page-products-list .fm-products-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 1280px) {
+    .page-products-list .fm-products-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
 
 .fm-catalog-wrap { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: 1.25rem; }
 .fm-catalog-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
@@ -766,6 +808,16 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1rem 1.25rem;
 }
 .fm-filter-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1; }
+
+/* AJOUT — conteneur des boutons "Toutes les catégories" + "Filtrer" (manquant) */
+.fm-filter-left {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    flex: 1;
+}
+
 .fm-sort { display: flex; align-items: center; gap: 8px; }
 .fm-sort-label { font-size: 0.82rem; color: #64748b; white-space: nowrap; }
 .fm-select {
@@ -774,6 +826,53 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     appearance: none; cursor: pointer; transition: border-color 180ms;
 }
 .fm-select:focus { outline: none; border-color: #16a34a; }
+
+/* AJOUT — bouton "Toutes les catégories" (pilule outline, manquant) */
+.fm-btn-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 1.2rem;
+    border-radius: 9999px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #334155;
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 150ms, border-color 150ms, color 150ms;
+}
+.fm-btn-outline:hover {
+    background: #f8fafc;
+    border-color: #16a34a;
+    color: #15803d;
+}
+
+/* AJOUT — bouton "Filtrer" (pilule pleine verte, petit format, manquant) */
+.fm-btn-primary-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 1.3rem;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    background: #16a34a;
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 150ms, transform 150ms;
+}
+.fm-btn-primary-sm:hover {
+    background: #15803d;
+    transform: translateY(-1px);
+}
+.fm-btn-primary-sm:active {
+    transform: scale(0.97);
+}
 
 .fm-cat-pills { display: flex; flex-wrap: wrap; gap: 8px; }
 .fm-cat-pill {

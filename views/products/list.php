@@ -15,6 +15,14 @@ $defaultCatIcons = [
     'Oeufs'   => '🥚',
 ];
 $catIcons = $catIcons ?? [];
+
+/* ── Détermine si une catégorie est actuellement sélectionnée ── */
+$hasActiveCategory = false;
+if (!empty($categoryLinks)) {
+    foreach ($categoryLinks as $cat) {
+        if (!empty($cat['active'])) { $hasActiveCategory = true; break; }
+    }
+}
 ?>
 
 <div class="page-content page-products-list pb-16">
@@ -32,9 +40,11 @@ $catIcons = $catIcons ?? [];
         </div>
 
         <!-- ── Pilules catégories ──────────────────────── -->
-        <?php if (!empty($categoryLinks)) : ?>
         <div class="fm-cat-pills">
-            <?php foreach ($categoryLinks as $cat) :
+            <a href="index.php?action=products" class="fm-cat-pill <?= !$hasActiveCategory ? 'fm-cat-active' : '' ?>">
+                🌿 Tout
+            </a>
+            <?php if (!empty($categoryLinks)) : foreach ($categoryLinks as $cat) :
                 $emoji = $cat['emoji']
                       ?? $defaultCatIcons[$cat['label']]
                       ?? '🌿';
@@ -43,9 +53,8 @@ $catIcons = $catIcons ?? [];
                    class="fm-cat-pill <?= !empty($cat['active']) ? 'fm-cat-active' : '' ?>">
                     <?= $emoji ?> <?= htmlspecialchars($cat['label']) ?>
                 </a>
-            <?php endforeach; ?>
+            <?php endforeach; endif; ?>
         </div>
-        <?php endif; ?>
 
         <!-- ── Barre filtre + tri ──────────────────────── -->
         <div class="fm-filter-bar">
