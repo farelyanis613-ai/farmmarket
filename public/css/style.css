@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    FARMMARKET — style.css (nettoyé)
    Corrections apportées par rapport à l'original :
    1. Le `body { background: var(--ivoire); color: var(--ardoise); }` non
@@ -1066,7 +1066,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 .fm-op-pill:hover { border-color: var(--op-color); background: var(--op-bg); }
 .fm-op-active { border-color: var(--op-color) !important; background: var(--op-bg) !important; color: #0f172a; }
-.fm-op-logo { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 800; color: #fff; }
+.fm-op-logo { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 800; color: #fff; flex-shrink: 0; }
 .fm-op-check { display: none; font-size: .75rem; color: #16a34a; font-weight: 800; }
 .fm-op-active .fm-op-check { display: inline; }
 
@@ -1279,7 +1279,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .fo-flash--error { background: #fff1f2; border-color: #fecdd3; color: #9f1239; }
 
 .fo-empty { background: #fff; border: 1px solid #e2e8f0; border-radius: 1.25rem; padding: 4rem 2rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.75rem; }
-.fo-empty-icon { width: 3.5rem; height: 3.5rem; border-radius: 50%; background: #fffbeb; color: #f59e0b; display: flex; align-items: center; justify-content: center; }
+.fo-empty-icon { width: 3.5rem; height: 3.5rem; border-radius: 50%; background: #fffbeb; color: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
 .fo-empty-title { font-size: 1rem; font-weight: 600; color: #334155; margin: 0; }
 .fo-empty-sub { font-size: 0.85rem; color: #94a3b8; margin: 0; }
 
@@ -1527,7 +1527,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .page-delivery-stats .legend-pct { font-weight: 800; font-variant-numeric: tabular-nums; }
 .page-delivery-stats .earnings-card { background: linear-gradient(135deg, #78350F 0%, #92400E 60%, #B45309 100%); border-radius: 20px; padding: 28px 28px; color: #fff; position: relative; overflow: hidden; margin-bottom: 14px; }
 .page-delivery-stats .earnings-card .deco-circle { position: absolute; border-radius: 50%; background: rgba(255,255,255,.06); }
-.page-delivery-stats .earnings-card .label { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; opacity: .7; margin-bottom: 8px; }
+.page-delivery-stats .earnings-card .label { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; opacity: .7; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
 .page-delivery-stats .earnings-card .amount { font-size: 44px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
 .page-delivery-stats .earnings-card .unit { font-size: 16px; font-weight: 500; opacity: .7; margin-left: 4px; }
 .page-delivery-stats .earnings-card .per { font-size: 13px; opacity: .6; margin-top: 6px; }
