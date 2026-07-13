@@ -1,7 +1,15 @@
 <?php
+$__t0 = microtime(true);
+function __log_timing($label) {
+    global $__t0;
+    error_log(sprintf('[TIMING] %s : +%.2fs', $label, microtime(true) - $__t0));
+}
+__log_timing('START');
+
 // Load environment helpers early so we can read APP_ENV and related vars
 require_once __DIR__ . '/config/bootstrap.php';
 loadEnvFile(__DIR__ . '/.env');
+__log_timing('apres loadEnvFile');
 
 // Configure secure session cookie params before starting the session
 $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
@@ -26,11 +34,15 @@ if ($cookieDomain !== '') {
 }
 session_set_cookie_params($cookieParams);
 session_start();
+__log_timing('apres session_start');
 
 require_once __DIR__ . '/config/database.php';
+__log_timing('apres database.php (connexion DB)');
+
 require_once __DIR__ . '/core/Model.php';
 require_once __DIR__ . '/core/Controller.php';
 require_once __DIR__ . '/core/helpers.php';
+__log_timing('apres tous les require core');
 
 $action = $_GET['action'] ?? 'home';
 $id = $_GET['id'] ?? null;
@@ -287,3 +299,4 @@ switch ($action) {
     default:
         require_once __DIR__ . '/views/home.php';
 }
+__log_timing('FIN - action=' . $action);
